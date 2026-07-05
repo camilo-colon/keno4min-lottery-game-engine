@@ -1,0 +1,127 @@
+{
+    "Comment": "Lottery Game Workflow",
+    "StartAt": "CreateGame",
+    "States": {
+        "CreateGame": {
+            "Type": "Task",
+            "Resource": "${CreateGameFunctionArn}",
+            "ResultPath": "$.game",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2
+                }
+            ],
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "HandleError"
+                }
+            ],
+            "Next": "WaitForBetsClose"
+        },
+        "WaitForBetsClose": {
+            "Type": "Wait",
+            "TimestampPath": "$.game.closesAt",
+            "Next": "CloseBets"
+        },
+        "CloseBets": {
+            "Type": "Task",
+            "Resource": "${CloseBetsFunctionArn}",
+            "Parameters": {
+                "gameId.$": "$.game.id"
+            },
+            "ResultPath": null,
+            "Next": "DrawBalls",
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "HandleError"
+                }
+            ]
+        },
+        "DrawBalls": {
+            "Type": "Task",
+            "Resource": "${DrawBallsFunctionArn}",
+            "Parameters": {
+                "gameId.$": "$.game.id"
+            },
+            "ResultPath": "$.game",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2
+                }
+            ],
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "HandleError"
+                }
+            ],
+            "Next": "PublishGamePlayed"
+        },
+        "PublishGamePlayed": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::events:putEvents",
+            "Parameters": {
+                "Entries": [
+                    {
+                        "EventBusName": "${DomainEventBusName}",
+                        "Source": "cronos.keno4min",
+                        "DetailType": "cronos.keno4min.game.played",
+                        "Detail": {
+                            "event_id.$": "States.UUID()",
+                            "type": "cronos.keno4min.game.played",
+                            "ocurred_on.$": "$$.State.EnteredTime",
+                            "aggregate_id.$": "$.game.id",
+                            "attributes.$": "$.game"
+                        }
+                    }
+                ]
+            },
+            "ResultPath": null,
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2
+                }
+            ],
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "HandleError"
+                }
+            ],
+            "Next": "Success"
+        },
+        "Success": {
+            "Type": "Succeed"
+        },
+        "HandleError": {
+            "Type": "Fail",
+            "Error": "GameWorkflowFailed",
+            "Cause": "An error occurred in the game workflow"
+        }
+    }
+}

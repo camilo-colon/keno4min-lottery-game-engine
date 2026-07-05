@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Deployment stage
+  DomainEventBusName:
+    Type: String
+    Default: cronos.domain_events
+    Description: EventBridge event bus for domain events
+
+Resources:
+  CreateGameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${Stage}-lottery-create-game"
+      CodeUri: functions/create-game/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Environment:
+        Variables:
+          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
+          STAGE: !Ref Stage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
+    Metadata:
+      BuildMethod: makefile
+
+  CloseBetsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${Stage}-lottery-close-bets"
+      CodeUri: functions/close-bets/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Environment:
+        Variables:
+          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
+          STAGE: !Ref Stage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
+    Metadata:
+      BuildMethod: makefile
+
+  DrawBallsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${Stage}-lottery-draw-balls"
+      CodeUri: functions/draw-balls/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Timeout: 30
+      MemorySize: 1024
+      Environment:
+        Variables:
+          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
+          STAGE: !Ref Stage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
+    Metadata:
+      BuildMethod: makefile
+
+  GameWorkflowStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Type: STANDARD
+      DefinitionUri: statemachine/game-workflow.asl.json
+      DefinitionSubstitutions:
+        CreateGameFunctionArn: !GetAtt CreateGameFunction.Arn
+        CloseBetsFunctionArn: !GetAtt CloseBetsFunction.Arn
+        DrawBallsFunctionArn: !GetAtt DrawBallsFunction.Arn
+        DomainEventBusName: !Ref DomainEventBusName
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CreateGameFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CloseBetsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DrawBallsFunction
+        - EventBridgePutEventsPolicy:
+            EventBusName: !Ref DomainEventBusName
+
+  GameScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${Stage}-lottery-game-schedule"
+      Description: Trigger new lottery game every 3 minutes
+      ScheduleExpression: "rate(3 minutes)"
+      State: ENABLED
+      Targets:
+        - Id: GameWorkflowTarget
+          Arn: !GetAtt GameWorkflowStateMachine.Arn
+          RoleArn: !GetAtt EventBridgeToStepFunctionsRole.Arn
+
+  EventBridgeToStepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StartStateMachine
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !GetAtt GameWorkflowStateMachine.Arn
