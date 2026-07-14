@@ -15,14 +15,6 @@ func losingTicket(total int64) domain.Ticket {
 	}
 }
 
-// bigWinTicket construye un ticket que hace perder a la casa: acierta 3 de 3.
-func bigWinTicket(total int64) domain.Ticket {
-	return domain.Ticket{
-		Total: total,
-		Bets:  []domain.Bet{{Money: 50000, Bitmask: mask(33, 54, 24)}},
-	}
-}
-
 func TestJackpotIncrement(t *testing.T) {
 	jp := domain.Jackpot{Percent: 1}
 
@@ -33,19 +25,24 @@ func TestJackpotIncrement(t *testing.T) {
 		want    int64
 	}{
 		{
-			name: "solo aportan los tickets con utilidad positiva",
+			name: "las perdidas restan del neto (neto positivo incrementa)",
 			jp:   jp,
 			tickets: []domain.Ticket{
-				losingTicket(150000), // utilidad +150000
-				bigWinTicket(50000),  // pagó 2.500.000 → utilidad negativa, excluido
+				losingTicket(2000), // apostado 2000, gana 0 -> +2000
+				// apostado 500, acierta 2 de 3 (factor 200) -> gana 1000 -> -500
+				{Total: 500, Bets: []domain.Bet{{Money: 500, Bitmask: mask(7, 9, 1)}}},
 			},
-			want: 1500, // 150000 * 1 / 100
+			want: 15, // neto 1500 * 1 / 100
 		},
 		{
-			name:    "club con pérdida neta no aporta",
-			jp:      jp,
-			tickets: []domain.Ticket{bigWinTicket(50000)},
-			want:    0,
+			name: "neto negativo no incrementa",
+			jp:   jp,
+			tickets: []domain.Ticket{
+				// apostado 500, acierta 3 de 3 (factor 5000) -> gana 25000 -> -24500
+				{Total: 500, Bets: []domain.Bet{{Money: 500, Bitmask: mask(7, 9, 11)}}},
+				losingTicket(2000), // apostado 2000, gana 0 -> +2000
+			},
+			want: 0, // neto -22500
 		},
 		{
 			name:    "sin tickets no aporta",
@@ -54,7 +51,7 @@ func TestJackpotIncrement(t *testing.T) {
 			want:    0,
 		},
 		{
-			name: "suma antes de aplicar el porcentaje (una sola división)",
+			name: "suma el neto antes de aplicar el porcentaje (una sola division)",
 			jp:   domain.Jackpot{Percent: 1},
 			tickets: []domain.Ticket{
 				losingTicket(150), // +150
@@ -71,4 +68,3 @@ func TestJackpotIncrement(t *testing.T) {
 		})
 	}
 }
-
