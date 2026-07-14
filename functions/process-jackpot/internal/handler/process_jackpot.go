@@ -15,6 +15,7 @@ type ProcessJackpotHandler struct {
 	tickets ports.TicketRepository
 	clubs   ports.ClubRepository
 	runs    ports.RunRepository
+	awards  ports.JackpotAwardRepository
 	tx      ports.TransactionManager
 	rng     ports.Randomizer
 }
@@ -24,6 +25,7 @@ func NewProcessJackpotHandler(
 	tickets ports.TicketRepository,
 	clubs ports.ClubRepository,
 	runs ports.RunRepository,
+	awards ports.JackpotAwardRepository,
 	tx ports.TransactionManager,
 	rng ports.Randomizer,
 ) *ProcessJackpotHandler {
@@ -31,6 +33,7 @@ func NewProcessJackpotHandler(
 		tickets: tickets,
 		clubs:   clubs,
 		runs:    runs,
+		awards:  awards,
 		tx:      tx,
 		rng:     rng,
 	}
@@ -116,6 +119,12 @@ func (h *ProcessJackpotHandler) playJackpot(ctx context.Context, clubID string, 
 	winner := tickets[h.rng.Intn(len(tickets))]
 
 	if err := h.tickets.AssignJackpot(ctx, winner.ID, jackpot.Value); err != nil {
+		return err
+	}
+
+	// Registrar el premio en el histórico dentro de la misma transacción, para
+	// que sea consistente con el pago y el reset del pozo.
+	if err := h.awards.Record(ctx, domain.NewJackpotAward(winner, jackpot.Value)); err != nil {
 		return err
 	}
 

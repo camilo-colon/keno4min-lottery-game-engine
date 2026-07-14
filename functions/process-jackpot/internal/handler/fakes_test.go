@@ -89,6 +89,19 @@ func (f *fakeTickets) AssignJackpot(ctx context.Context, ticketID string, amount
 	return f.assignErr
 }
 
+// fakeAwards registra los premios de jackpot históricos.
+type fakeAwards struct {
+	recordCalls int
+	recorded    domain.JackpotAward
+	err         error
+}
+
+func (f *fakeAwards) Record(ctx context.Context, award domain.JackpotAward) error {
+	f.recordCalls++
+	f.recorded = award
+	return f.err
+}
+
 // fakeRng devuelve valores deterministas.
 type fakeRng struct {
 	intn    int
