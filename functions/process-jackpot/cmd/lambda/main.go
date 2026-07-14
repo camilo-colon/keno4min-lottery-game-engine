@@ -40,10 +40,11 @@ func lambdaHandler(ctx context.Context, input EventInput) (*Output, error) {
 	ticketStore := adapters.NewTicketStore(db.DB)
 	clubStore := adapters.NewClubStore(db.DB)
 	runStore := adapters.NewRunStore(db.DB)
+	awardStore := adapters.NewJackpotAwardStore(db.DB)
 	txManager := adapters.NewMongoTransactionManager(db.Client)
 	randomizer := adapters.NewCryptoRandomizer()
 
-	handler := handler.NewProcessJackpotHandler(ticketStore, clubStore, runStore, txManager, randomizer)
+	handler := handler.NewProcessJackpotHandler(ticketStore, clubStore, runStore, awardStore, txManager, randomizer)
 	processed, err := handler.Handle(ctx, input.Game)
 	if err != nil {
 		return nil, fmt.Errorf("error processing jackpot: %w", err)

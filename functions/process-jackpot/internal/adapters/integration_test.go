@@ -181,6 +181,65 @@ func TestTransactionRollback(t *testing.T) {
 	}
 }
 
+// TestJackpotAwardStoreRecord verifica que el premio se persiste con sus campos.
+func TestJackpotAwardStoreRecord(t *testing.T) {
+	ctx := context.Background()
+	col := testDB.Collection("jackpot_awards")
+	if err := col.Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	store := adapters.NewJackpotAwardStore(testDB)
+	winner := domain.Ticket{ID: "t1", Cupon: "ABC123", Round: 42, GameID: "g1", ClubID: "A"}
+	award := domain.NewJackpotAward(winner, 25_000_000)
+
+	if err := store.Record(ctx, award); err != nil {
+		t.Fatal(err)
+	}
+
+	var got domain.JackpotAward
+	if err := col.FindOne(ctx, bson.M{"_id": award.ID}).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.ClubID != "A" || got.GameID != "g1" || got.TicketID != "t1" ||
+		got.Cupon != "ABC123" || got.Round != 42 || got.Value != 25_000_000 {
+		t.Errorf("award persistido = %+v", got)
+	}
+}
+
+// TestAwardRollback verifica que si la transacción falla tras registrar el premio,
+// el histórico NO queda con el registro (consistencia con el pago real).
+func TestAwardRollback(t *testing.T) {
+	ctx := context.Background()
+	awards := testDB.Collection("jackpot_awards")
+	if err := awards.Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	store := adapters.NewJackpotAwardStore(testDB)
+	tm := adapters.NewMongoTransactionManager(testClient)
+
+	winner := domain.Ticket{ID: "t1", Cupon: "X", Round: 1, GameID: "g1", ClubID: "A"}
+	boom := errors.New("boom")
+
+	err := tm.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := store.Record(txCtx, domain.NewJackpotAward(winner, 1000)); err != nil {
+			return err
+		}
+		return boom // falla tras registrar el premio → rollback
+	})
+	if !errors.Is(err, boom) {
+		t.Fatalf("se esperaba boom, got %v", err)
+	}
+
+	count, err := awards.CountDocuments(ctx, bson.M{"game_id": "g1", "club_id": "A"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Errorf("rollback fallido: quedaron %d premios, want 0", count)
+	}
+}
+
 // TestClubStoreIncrementAndReset verifica el $inc atómico y el reemplazo de jp1.
 func TestClubStoreIncrementAndReset(t *testing.T) {
 	ctx := context.Background()

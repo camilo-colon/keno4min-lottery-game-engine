@@ -26,7 +26,7 @@ func newClub() *domain.Club {
 }
 
 func TestHandleFailsWithoutDrawnBalls(t *testing.T) {
-	h := handler.NewProcessJackpotHandler(&fakeTickets{}, &fakeClubs{}, &fakeRuns{}, fakeTx{}, fakeRng{})
+	h := handler.NewProcessJackpotHandler(&fakeTickets{}, &fakeClubs{}, &fakeRuns{}, &fakeAwards{}, fakeTx{}, fakeRng{})
 
 	_, err := h.Handle(context.Background(), domain.Game{ID: "g1"}) // Balls == nil
 	if err == nil {
@@ -39,7 +39,7 @@ func TestProcessClubSkipsWhenAlreadyProcessed(t *testing.T) {
 	clubs := &fakeClubs{club: newClub()}
 	runs := &fakeRuns{err: ports.ErrAlreadyProcessed}
 
-	h := handler.NewProcessJackpotHandler(tickets, clubs, runs, fakeTx{}, fakeRng{})
+	h := handler.NewProcessJackpotHandler(tickets, clubs, runs, &fakeAwards{}, fakeTx{}, fakeRng{})
 
 	processed, err := h.Handle(context.Background(), drawnGame("g1"))
 	if err != nil {
@@ -70,7 +70,7 @@ func TestProcessClubIncrementsWithoutPlaying(t *testing.T) {
 		incrementResult: &domain.Jackpot{Value: 16_000_000, Target: 20_000_000}, // < target → no juega
 	}
 
-	h := handler.NewProcessJackpotHandler(tickets, clubs, &fakeRuns{}, fakeTx{}, fakeRng{})
+	h := handler.NewProcessJackpotHandler(tickets, clubs, &fakeRuns{}, &fakeAwards{}, fakeTx{}, fakeRng{})
 
 	if _, err := h.Handle(context.Background(), drawnGame("g1")); err != nil {
 		t.Fatalf("error inesperado: %v", err)
@@ -88,18 +88,25 @@ func TestProcessClubIncrementsWithoutPlaying(t *testing.T) {
 }
 
 func TestProcessClubPlaysJackpot(t *testing.T) {
+	winner := losingTicket("t1", domain.PAYED, 1_000_000) // utilidad +1M
+	winner.Cupon = "ABC123"
+	winner.Round = 42
+	winner.GameID = "g1"
+	winner.ClubID = "c1"
+
 	tickets := &fakeTickets{
 		clubIDs: []string{"c1"},
 		// El puerto ya filtra cancelados: aquí solo llegan tickets elegibles.
-		tickets: []domain.Ticket{losingTicket("t1", domain.PAYED, 1_000_000)}, // utilidad +1M
+		tickets: []domain.Ticket{winner},
 	}
 	clubs := &fakeClubs{
 		club:            newClub(),
 		incrementResult: &domain.Jackpot{Value: 25_000_000, Target: 20_000_000}, // >= target → juega
 	}
+	awards := &fakeAwards{}
 	rng := fakeRng{intn: 0, between: 20_000_000}
 
-	h := handler.NewProcessJackpotHandler(tickets, clubs, &fakeRuns{}, fakeTx{}, rng)
+	h := handler.NewProcessJackpotHandler(tickets, clubs, &fakeRuns{}, awards, fakeTx{}, rng)
 
 	if _, err := h.Handle(context.Background(), drawnGame("g1")); err != nil {
 		t.Fatalf("error inesperado: %v", err)
@@ -114,6 +121,16 @@ func TestProcessClubPlaysJackpot(t *testing.T) {
 	}
 	if tickets.assignedAmount != 25_000_000 {
 		t.Errorf("premio asignado = %d, want 25000000 (jackpot.Value)", tickets.assignedAmount)
+	}
+
+	// Registra el premio en el histórico con los datos del ganador.
+	if awards.recordCalls != 1 {
+		t.Fatalf("recordCalls = %d, want 1", awards.recordCalls)
+	}
+	got := awards.recorded
+	if got.ClubID != "c1" || got.GameID != "g1" || got.TicketID != "t1" ||
+		got.Cupon != "ABC123" || got.Round != 42 || got.Value != 25_000_000 {
+		t.Errorf("award registrado = %+v, want club=c1 game=g1 ticket=t1 cupon=ABC123 round=42 value=25000000", got)
 	}
 
 	// Resetea el jp1 con la config y el target aleatorio.
@@ -131,7 +148,7 @@ func TestProcessClubZeroIncrementSkipsWrites(t *testing.T) {
 	clubs := &fakeClubs{club: newClub()}                           // jp1.Value 100 < Target → no juega
 	runs := &fakeRuns{}
 
-	h := handler.NewProcessJackpotHandler(tickets, clubs, runs, fakeTx{}, fakeRng{})
+	h := handler.NewProcessJackpotHandler(tickets, clubs, runs, &fakeAwards{}, fakeTx{}, fakeRng{})
 
 	if _, err := h.Handle(context.Background(), drawnGame("g1")); err != nil {
 		t.Fatalf("error inesperado: %v", err)
@@ -161,7 +178,7 @@ func TestProcessClubPropagatesWriteError(t *testing.T) {
 	}
 	rng := fakeRng{intn: 0, between: 20_000_000}
 
-	h := handler.NewProcessJackpotHandler(tickets, clubs, &fakeRuns{}, fakeTx{}, rng)
+	h := handler.NewProcessJackpotHandler(tickets, clubs, &fakeRuns{}, &fakeAwards{}, fakeTx{}, rng)
 
 	_, err := h.Handle(context.Background(), drawnGame("g1"))
 	if !errors.Is(err, boom) {
@@ -174,7 +191,7 @@ func TestHandleProcessesAllClubs(t *testing.T) {
 	clubs := &fakeClubs{club: newClub()}
 	runs := &fakeRuns{}
 
-	h := handler.NewProcessJackpotHandler(tickets, clubs, runs, fakeTx{}, fakeRng{})
+	h := handler.NewProcessJackpotHandler(tickets, clubs, runs, &fakeAwards{}, fakeTx{}, fakeRng{})
 
 	processed, err := h.Handle(context.Background(), drawnGame("g1"))
 	if err != nil {
