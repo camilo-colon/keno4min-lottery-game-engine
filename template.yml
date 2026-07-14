@@ -78,6 +78,28 @@ Resources:
     Metadata:
       BuildMethod: makefile
 
+  ProcessJackpotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${Stage}-lottery-process-jackpot"
+      CodeUri: functions/process-jackpot/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Timeout: 30
+      MemorySize: 1024
+      Environment:
+        Variables:
+          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
+          STAGE: !Ref Stage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
+    Metadata:
+      BuildMethod: makefile
+
   GameWorkflowStateMachine:
     Type: AWS::Serverless::StateMachine
     Properties:
@@ -87,6 +109,7 @@ Resources:
         CreateGameFunctionArn: !GetAtt CreateGameFunction.Arn
         CloseBetsFunctionArn: !GetAtt CloseBetsFunction.Arn
         DrawBallsFunctionArn: !GetAtt DrawBallsFunction.Arn
+        ProcessJackpotFunctionArn: !GetAtt ProcessJackpotFunction.Arn
         DomainEventBusName: !Ref DomainEventBusName
       Policies:
         - LambdaInvokePolicy:
@@ -95,6 +118,8 @@ Resources:
             FunctionName: !Ref CloseBetsFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref DrawBallsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ProcessJackpotFunction
         - EventBridgePutEventsPolicy:
             EventBusName: !Ref DomainEventBusName
 

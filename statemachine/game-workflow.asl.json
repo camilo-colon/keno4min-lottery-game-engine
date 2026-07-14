@@ -73,6 +73,33 @@
                     "Next": "HandleError"
                 }
             ],
+            "Next": "ProcessJackpot"
+        },
+        "ProcessJackpot": {
+            "Type": "Task",
+            "Resource": "${ProcessJackpotFunctionArn}",
+            "Parameters": {
+                "game.$": "$.game"
+            },
+            "ResultPath": "$.jackpot",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2
+                }
+            ],
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "HandleError"
+                }
+            ],
             "Next": "PublishGamePlayed"
         },
         "PublishGamePlayed": {

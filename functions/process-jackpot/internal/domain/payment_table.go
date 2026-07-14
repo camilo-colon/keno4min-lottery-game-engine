@@ -1,6 +1,10 @@
-package utils
+package domain
 
-var PaymentTable = map[int][]int{
+// PaymentTable define el factor de pago por (números apostados, aciertos).
+//   - clave: cantidad de números de la apuesta (picks)
+//   - índice: cantidad de aciertos contra las balotas (hits)
+//   - valor: factor de pago aplicado al monto apostado
+var PaymentTable = map[int][]int64{
 	1:  {0, 350},
 	2:  {0, 10, 100},
 	3:  {0, 0, 200, 5000},
