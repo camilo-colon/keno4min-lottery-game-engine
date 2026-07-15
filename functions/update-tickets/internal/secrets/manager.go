@@ -40,6 +40,12 @@ func (m *Manager) GetMongoDBCredentials(ctx context.Context, secretArn string) (
 		return nil, fmt.Errorf("failed to get secret: %w", err)
 	}
 
+	// SecretString viene vacío si el secret se guardó como binario: el valor
+	// estaría en SecretBinary y desreferenciarlo haría panic.
+	if result.SecretString == nil {
+		return nil, fmt.Errorf("secret %s has no string value (stored as binary?)", secretArn)
+	}
+
 	var creds MongoDBCredentials
 	if err := json.Unmarshal([]byte(*result.SecretString), &creds); err != nil {
 		return nil, fmt.Errorf("failed to parse secret: %w", err)
