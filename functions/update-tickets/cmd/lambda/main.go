@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/adapters"
@@ -22,6 +23,32 @@ type Output struct {
 	ResolvedTickets int    `json:"resolvedTickets"`
 }
 
+var (
+	dbMu     sync.Mutex
+	cachedDB *database.MongoDB
+)
+
+// getDB reutiliza la conexión a MongoDB entre invocaciones tibias: el contenedor
+// Lambda sobrevive al handler, así que reconectar en cada invocación pagaría el
+// handshake de nuevo y rotaría slots de conexión en Atlas. Si la conexión falla
+// no se cachea nada, y la siguiente invocación vuelve a intentarlo.
+func getDB(ctx context.Context, cfg *config.Config) (*database.MongoDB, error) {
+	dbMu.Lock()
+	defer dbMu.Unlock()
+
+	if cachedDB != nil {
+		return cachedDB, nil
+	}
+
+	db, err := database.Connect(ctx, cfg.MongoURI, cfg.DatabaseName)
+	if err != nil {
+		return nil, err
+	}
+
+	cachedDB = db
+	return cachedDB, nil
+}
+
 func lambdaHandler(ctx context.Context, input EventInput) (*Output, error) {
 	cfg, err := config.Load(ctx)
 	if err != nil {
@@ -29,12 +56,10 @@ func lambdaHandler(ctx context.Context, input EventInput) (*Output, error) {
 	}
 
 	// Conectar a MongoDB
-	db, err := database.Connect(ctx, cfg.MongoURI, cfg.DatabaseName)
+	db, err := getDB(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to MongoDB: %w", err)
 	}
-
-	defer db.Disconnect(ctx)
 
 	// Inicializar adapters
 	ticketStore := adapters.NewTicketStore(db.DB)
