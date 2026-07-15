@@ -73,6 +73,33 @@
                     "Next": "HandleError"
                 }
             ],
+            "Next": "UpdateTickets"
+        },
+        "UpdateTickets": {
+            "Type": "Task",
+            "Resource": "${UpdateTicketsFunctionArn}",
+            "Parameters": {
+                "game.$": "$.game"
+            },
+            "ResultPath": "$.settledTickets",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2
+                }
+            ],
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "HandleError"
+                }
+            ],
             "Next": "ProcessJackpot"
         },
         "ProcessJackpot": {

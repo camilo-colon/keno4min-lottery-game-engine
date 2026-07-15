@@ -3,7 +3,7 @@ package domain_test
 import (
 	"testing"
 
-	"github.com/cronos/keno4min-lottery-game-engine/functions/process-jackpot/internal/domain"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/domain"
 )
 
 func TestBetPayout(t *testing.T) {

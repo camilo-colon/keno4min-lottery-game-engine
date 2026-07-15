@@ -40,13 +40,14 @@ func NewProcessJackpotHandler(
 }
 
 // Handle procesa el jackpot de todos los clubes que participaron en el juego.
-// El sorteo (balotas) viene en game.Balls, fuente de la verdad del juego recién
-// ejecutado por DrawBalls. Devuelve la cantidad de clubes procesados.
+// game.Balls no se usa para calcular —el payout ya viene persistido en cada
+// ticket por update-tickets— pero se exige presente como invariante: garantiza
+// que DrawBalls corrió y que los tickets pudieron ser resueltos.
+// Devuelve la cantidad de clubes procesados.
 func (h *ProcessJackpotHandler) Handle(ctx context.Context, game domain.Game) (int, error) {
 	if game.Balls == nil {
 		return 0, fmt.Errorf("game %s has no drawn balls", game.ID)
 	}
-	balls := game.Balls.Mask
 
 	clubIDs, err := h.tickets.FindClubIDsByGame(ctx, game.ID)
 	if err != nil {
@@ -54,7 +55,7 @@ func (h *ProcessJackpotHandler) Handle(ctx context.Context, game domain.Game) (i
 	}
 
 	for _, clubID := range clubIDs {
-		if err := h.processClub(ctx, game.ID, clubID, balls); err != nil {
+		if err := h.processClub(ctx, game.ID, clubID); err != nil {
 			return 0, err
 		}
 	}
@@ -66,7 +67,7 @@ func (h *ProcessJackpotHandler) Handle(ctx context.Context, game domain.Game) (i
 // juego del jackpot de un club. Toda la unidad de trabajo —marca de idempotencia,
 // lecturas y escrituras de dinero— vive en una sola transacción: o se commitea
 // completa, o se hace rollback de todo.
-func (h *ProcessJackpotHandler) processClub(ctx context.Context, gameID, clubID string, balls domain.Bitmask) error {
+func (h *ProcessJackpotHandler) processClub(ctx context.Context, gameID, clubID string) error {
 	err := h.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// Guardián de idempotencia: si ya se procesó, aborta la transacción.
 		if err := h.runs.Mark(txCtx, gameID, clubID); err != nil {
@@ -83,7 +84,7 @@ func (h *ProcessJackpotHandler) processClub(ctx context.Context, gameID, clubID 
 			return err
 		}
 
-		increment := domain.JackpotIncrement(club.JP1, tickets, balls)
+		increment := domain.JackpotIncrement(club.JP1, tickets)
 
 		// Si no hay utilidad positiva el pozo no cambia: evaluamos ShouldPlay
 		// sobre el jackpot actual sin escribir.
