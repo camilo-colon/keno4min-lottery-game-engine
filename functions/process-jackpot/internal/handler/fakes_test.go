@@ -111,14 +111,13 @@ type fakeRng struct {
 func (f fakeRng) Intn(n int) int                    { return f.intn }
 func (f fakeRng) Int64Between(min, max int64) int64 { return f.between }
 
-// losingTicket es un ticket cuyas apuestas no pagan (bitmask vacía), por lo que
-// su utilidad para la casa es igual a lo apostado.
+// losingTicket es un ticket sin premio ganado (Win 0, ya persistido por
+// update-tickets), por lo que su utilidad para la casa es igual a lo apostado.
 func losingTicket(id string, state domain.TicketState, total int64) domain.Ticket {
 	return domain.Ticket{
 		ID:    id,
 		State: state,
 		Total: total,
-		Bets:  []domain.Bet{{Money: total, Bitmask: domain.Bitmask{}}},
 	}
 }
 
