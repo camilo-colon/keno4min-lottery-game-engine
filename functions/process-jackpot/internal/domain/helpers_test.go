@@ -16,6 +16,3 @@ func mask(nums ...int64) domain.Bitmask {
 	}
 	return b
 }
-
-// gameBalls son las balotas reales del sorteo de ejemplo (game DRAWN).
-var gameBalls = mask(7, 9, 11, 13, 16, 18, 24, 25, 26, 30, 33, 42, 44, 54, 55, 58, 62, 66, 77, 80)
