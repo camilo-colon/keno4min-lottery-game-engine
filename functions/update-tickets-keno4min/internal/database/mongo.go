@@ -25,6 +25,9 @@ func Connect(ctx context.Context, uri, dbName string) (*MongoDB, error) {
 
 	// Ping para verificar conexión
 	if err := client.Ping(ctx, nil); err != nil {
+		disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = client.Disconnect(disconnectCtx)
 		return nil, err
 	}
 
