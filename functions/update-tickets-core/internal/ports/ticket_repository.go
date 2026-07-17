@@ -23,7 +23,8 @@ type TicketRepository interface {
 	// nil trae la primera página; el cursor devuelto es nil cuando no hay más
 	// páginas.
 	FindPendingByGame(ctx context.Context, gameID string, cursor *string, limit int64) ([]domain.Ticket, *string, error)
-	// UpdateTickets persiste win y state de los tickets recibidos en un solo
-	// BulkWrite. El ticket del core no almacena balotas, así que no se tocan.
+	// UpdateTickets persiste win, state y las balotas resueltas (metadata.balls,
+	// como las deja Ticket.Resolve) de los tickets recibidos en un solo
+	// BulkWrite.
 	UpdateTickets(ctx context.Context, tickets []domain.Ticket) error
 }
