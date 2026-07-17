@@ -9,10 +9,10 @@ import (
 )
 
 // DefaultBatchSize es el tamaño de página usado para paginar los tickets de un
-// juego al resolverlos, igual que close-bets pagina el pase PENDING -> DRAWING.
+// juego al resolverlos.
 const DefaultBatchSize int64 = 500
 
-// UpdateTicketsHandler resuelve los tickets DRAWING de un juego contra las
+// UpdateTicketsHandler resuelve los tickets PENDING de un juego contra las
 // balotas sorteadas por DrawBalls.
 type UpdateTicketsHandler struct {
 	tickets   ports.TicketRepository
@@ -27,7 +27,7 @@ func NewUpdateTicketsHandler(tickets ports.TicketRepository, batchSize int64) *U
 	return &UpdateTicketsHandler{tickets: tickets, batchSize: batchSize}
 }
 
-// Handle resuelve todos los tickets DRAWING del juego: calcula win y state
+// Handle resuelve todos los tickets PENDING del juego: calcula win y state
 // contra game.Balls y les copia las balotas sorteadas. Devuelve la cantidad de
 // tickets resueltos.
 func (h *UpdateTicketsHandler) Handle(ctx context.Context, game domain.Game) (int, error) {
@@ -39,7 +39,7 @@ func (h *UpdateTicketsHandler) Handle(ctx context.Context, game domain.Game) (in
 	var cursor *string
 	total := 0
 	for {
-		tickets, next, err := h.tickets.FindDrawingByGame(ctx, game.ID, cursor, h.batchSize)
+		tickets, next, err := h.tickets.FindPendingByGame(ctx, game.ID, cursor, h.batchSize)
 		if err != nil {
 			return 0, err
 		}

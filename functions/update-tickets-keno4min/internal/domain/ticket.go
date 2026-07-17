@@ -66,7 +66,7 @@ func (t Ticket) Payout(balls Bitmask) int64 {
 // Resolve liquida el ticket contra las balotas sorteadas de un juego DRAWN:
 // calcula el win, deriva el nuevo estado (WINNING si win > 0, LOSS si no) y
 // copia las balotas sorteadas al ticket. Solo debe invocarse sobre tickets en
-// estado DRAWING (ver ports.TicketRepository para la regla de filtrado).
+// estado PENDING (ver ports.TicketRepository para la regla de filtrado).
 func (t *Ticket) Resolve(balls GameBalls) {
 	t.Win = t.Payout(balls.Mask)
 	if t.Win > 0 {

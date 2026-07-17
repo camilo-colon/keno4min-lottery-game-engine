@@ -16,7 +16,7 @@ type fakeTickets struct {
 	findCalls  int
 }
 
-func (f *fakeTickets) FindDrawingByGame(ctx context.Context, gameID string, cursor *string, limit int64) ([]domain.Ticket, *string, error) {
+func (f *fakeTickets) FindPendingByGame(ctx context.Context, gameID string, cursor *string, limit int64) ([]domain.Ticket, *string, error) {
 	idx := f.findCalls
 	f.findCalls++
 

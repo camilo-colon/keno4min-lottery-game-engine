@@ -20,17 +20,17 @@ func NewTicketStore(db *mongo.Database) *TicketStore {
 	}
 }
 
-// FindDrawingByGame devuelve una página de tickets DRAWING del juego, ordenados
+// FindPendingByGame devuelve una página de tickets PENDING del juego, ordenados
 // por _id ascendente. Ver ports.TicketRepository para la regla de por qué el
-// filtro es DRAWING y no "!= CANCELED".
-func (r *TicketStore) FindDrawingByGame(ctx context.Context, gameID string, cursor *string, limit int64) ([]domain.Ticket, *string, error) {
+// filtro es PENDING y no "!= CANCELED".
+func (r *TicketStore) FindPendingByGame(ctx context.Context, gameID string, cursor *string, limit int64) ([]domain.Ticket, *string, error) {
 	if limit <= 0 {
 		limit = 100
 	}
 
 	filter := bson.M{
 		"game_id": gameID,
-		"state":   domain.DRAWING,
+		"state":   domain.PENDING,
 	}
 	if cursor != nil && *cursor != "" {
 		filter["_id"] = bson.M{"$gt": *cursor}

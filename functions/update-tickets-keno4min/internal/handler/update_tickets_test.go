@@ -36,7 +36,7 @@ func TestHandleResolvesWinningTicket(t *testing.T) {
 	balls := mask(7, 9, 11)
 	winning := domain.Ticket{
 		ID:    "t1",
-		State: domain.DRAWING,
+		State: domain.PENDING,
 		Total: 50000,
 		Bets:  []domain.Bet{{Money: 50000, Bitmask: mask(7, 9, 11)}}, // 3/3 aciertos → factor 5000
 	}
@@ -72,7 +72,7 @@ func TestHandleResolvesLosingTicket(t *testing.T) {
 	balls := mask(7, 9, 11)
 	losing := domain.Ticket{
 		ID:    "t2",
-		State: domain.DRAWING,
+		State: domain.PENDING,
 		Total: 50000,
 		Bets:  []domain.Bet{{Money: 50000, Bitmask: mask(1, 2, 3)}}, // 0 aciertos
 	}
@@ -98,7 +98,7 @@ func TestHandleResolvesLosingTicket(t *testing.T) {
 	}
 }
 
-func TestHandleNoDrawingTicketsSkipsWrites(t *testing.T) {
+func TestHandleNoPendingTicketsSkipsWrites(t *testing.T) {
 	tickets := &fakeTickets{pages: [][]domain.Ticket{{}}}
 
 	h := handler.NewUpdateTicketsHandler(tickets, 0)
@@ -119,11 +119,11 @@ func TestHandleNoDrawingTicketsSkipsWrites(t *testing.T) {
 func TestHandlePaginatesAcrossBatches(t *testing.T) {
 	balls := mask(7, 9, 11)
 	page1 := []domain.Ticket{
-		{ID: "t1", State: domain.DRAWING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(1)}}},
-		{ID: "t2", State: domain.DRAWING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(2)}}},
+		{ID: "t1", State: domain.PENDING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(1)}}},
+		{ID: "t2", State: domain.PENDING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(2)}}},
 	}
 	page2 := []domain.Ticket{
-		{ID: "t3", State: domain.DRAWING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(3)}}},
+		{ID: "t3", State: domain.PENDING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(3)}}},
 	}
 	tickets := &fakeTickets{pages: [][]domain.Ticket{page1, page2}}
 
@@ -160,7 +160,7 @@ func TestHandlePropagatesFindError(t *testing.T) {
 
 func TestHandlePropagatesUpdateError(t *testing.T) {
 	boom := errors.New("boom")
-	winning := domain.Ticket{ID: "t1", State: domain.DRAWING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(7)}}}
+	winning := domain.Ticket{ID: "t1", State: domain.PENDING, Bets: []domain.Bet{{Money: 100, Bitmask: mask(7)}}}
 	tickets := &fakeTickets{pages: [][]domain.Ticket{{winning}}, updateErr: boom}
 
 	h := handler.NewUpdateTicketsHandler(tickets, 0)
