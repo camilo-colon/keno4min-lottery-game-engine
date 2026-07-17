@@ -1,0 +1,18 @@
+package domain
+
+// PaymentTable define el factor de pago por (números apostados, aciertos).
+//   - clave: cantidad de números de la apuesta (picks)
+//   - índice: cantidad de aciertos contra las balotas (hits)
+//   - valor: factor de pago aplicado al monto apostado
+var PaymentTable = map[int][]int64{
+	1:  {0, 350},
+	2:  {0, 10, 100},
+	3:  {0, 0, 200, 5000},
+	4:  {0, 0, 100, 1000, 10000},
+	5:  {0, 0, 100, 300, 2000, 15000},
+	6:  {0, 0, 0, 200, 1500, 6000, 50000},
+	7:  {100, 0, 0, 200, 400, 2000, 8000, 100000},
+	8:  {100, 0, 0, 0, 500, 1500, 5000, 20000, 200000},
+	9:  {200, 0, 0, 0, 100, 1000, 2500, 12500, 100000, 500000},
+	10: {200, 0, 0, 0, 0, 500, 3000, 10000, 30000, 200000, 1000000},
+}
