@@ -29,24 +29,7 @@
         "WaitForBetsClose": {
             "Type": "Wait",
             "TimestampPath": "$.game.closesAt",
-            "Next": "CloseBets"
-        },
-        "CloseBets": {
-            "Type": "Task",
-            "Resource": "${CloseBetsFunctionArn}",
-            "Parameters": {
-                "gameId.$": "$.game.id"
-            },
-            "ResultPath": null,
-            "Next": "DrawBalls",
-            "Catch": [
-                {
-                    "ErrorEquals": [
-                        "States.ALL"
-                    ],
-                    "Next": "HandleError"
-                }
-            ]
+            "Next": "DrawBalls"
         },
         "DrawBalls": {
             "Type": "Task",

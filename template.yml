@@ -36,26 +36,6 @@ Resources:
     Metadata:
       BuildMethod: makefile
 
-  CloseBetsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "${Stage}-lottery-close-bets"
-      CodeUri: functions/close-bets/
-      Handler: bootstrap
-      Runtime: provided.al2023
-      Environment:
-        Variables:
-          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
-          STAGE: !Ref Stage
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
-    Metadata:
-      BuildMethod: makefile
-
   DrawBallsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -155,7 +135,6 @@ Resources:
       DefinitionUri: statemachine/game-workflow.asl.json
       DefinitionSubstitutions:
         CreateGameFunctionArn: !GetAtt CreateGameFunction.Arn
-        CloseBetsFunctionArn: !GetAtt CloseBetsFunction.Arn
         DrawBallsFunctionArn: !GetAtt DrawBallsFunction.Arn
         UpdateTicketsKeno4minFunctionArn: !GetAtt UpdateTicketsKeno4minFunction.Arn
         UpdateTicketsCoreFunctionArn: !GetAtt UpdateTicketsCoreFunction.Arn
@@ -164,8 +143,6 @@ Resources:
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref CreateGameFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref CloseBetsFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref DrawBallsFunction
         - LambdaInvokePolicy:
