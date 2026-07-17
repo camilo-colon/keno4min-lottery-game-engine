@@ -77,7 +77,7 @@
         },
         "UpdateTickets": {
             "Type": "Task",
-            "Resource": "${UpdateTicketsFunctionArn}",
+            "Resource": "${UpdateTicketsKeno4minFunctionArn}",
             "Parameters": {
                 "game.$": "$.game"
             },

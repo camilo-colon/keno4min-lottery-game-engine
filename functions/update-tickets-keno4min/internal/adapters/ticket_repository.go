@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/domain"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/domain"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/domain"
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/handler"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/domain"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/handler"
 )
 
 // mask construye un Bitmask a partir de números (1..80), igual que en producción.

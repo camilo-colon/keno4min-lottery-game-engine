@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/secrets"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/secrets"
 )
 
 type Config struct {

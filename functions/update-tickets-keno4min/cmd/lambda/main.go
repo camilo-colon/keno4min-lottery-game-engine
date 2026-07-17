@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/adapters"
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/config"
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/database"
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/domain"
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/handler"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/adapters"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/config"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/database"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/domain"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/handler"
 )
 
 // EventInput recibe el game recién sorteado por DrawBalls (con sus balotas).

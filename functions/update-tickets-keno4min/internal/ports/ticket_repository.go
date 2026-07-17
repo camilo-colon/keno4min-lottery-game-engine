@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/domain"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/domain"
 )
 
 // TicketRepository define las operaciones necesarias sobre la colección de tickets.

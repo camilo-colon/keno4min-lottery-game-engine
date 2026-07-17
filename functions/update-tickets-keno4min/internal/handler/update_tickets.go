@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/domain"
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/ports"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/domain"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/ports"
 )
 
 // DefaultBatchSize es el tamaño de página usado para paginar los tickets de un

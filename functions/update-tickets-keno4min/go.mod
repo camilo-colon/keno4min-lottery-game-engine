@@ -1,4 +1,4 @@
-module github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets
+module github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min
 
 go 1.25.0
 

@@ -78,11 +78,11 @@ Resources:
     Metadata:
       BuildMethod: makefile
 
-  UpdateTicketsFunction:
+  UpdateTicketsKeno4minFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub "${Stage}-lottery-update-tickets"
-      CodeUri: functions/update-tickets/
+      FunctionName: !Sub "${Stage}-lottery-update-tickets-keno4min"
+      CodeUri: functions/update-tickets-keno4min/
       Handler: bootstrap
       Runtime: provided.al2023
       Timeout: 30
@@ -131,7 +131,7 @@ Resources:
         CreateGameFunctionArn: !GetAtt CreateGameFunction.Arn
         CloseBetsFunctionArn: !GetAtt CloseBetsFunction.Arn
         DrawBallsFunctionArn: !GetAtt DrawBallsFunction.Arn
-        UpdateTicketsFunctionArn: !GetAtt UpdateTicketsFunction.Arn
+        UpdateTicketsKeno4minFunctionArn: !GetAtt UpdateTicketsKeno4minFunction.Arn
         ProcessJackpotFunctionArn: !GetAtt ProcessJackpotFunction.Arn
         DomainEventBusName: !Ref DomainEventBusName
       Policies:
@@ -142,7 +142,7 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref DrawBallsFunction
         - LambdaInvokePolicy:
-            FunctionName: !Ref UpdateTicketsFunction
+            FunctionName: !Ref UpdateTicketsKeno4minFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref ProcessJackpotFunction
         - EventBridgePutEventsPolicy:

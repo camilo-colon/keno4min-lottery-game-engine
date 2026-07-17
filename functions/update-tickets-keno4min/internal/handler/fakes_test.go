@@ -3,7 +3,7 @@ package handler_test
 import (
 	"context"
 
-	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets/internal/domain"
+	"github.com/cronos/keno4min-lottery-game-engine/functions/update-tickets-keno4min/internal/domain"
 )
 
 // fakeTickets simula el repositorio de tickets paginando en memoria por páginas
