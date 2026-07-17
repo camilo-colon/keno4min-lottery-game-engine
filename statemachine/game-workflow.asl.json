@@ -73,23 +73,57 @@
                     "Next": "HandleError"
                 }
             ],
-            "Next": "UpdateTickets"
+            "Next": "SettleTickets"
         },
-        "UpdateTickets": {
-            "Type": "Task",
-            "Resource": "${UpdateTicketsFunctionArn}",
-            "Parameters": {
-                "game.$": "$.game"
-            },
-            "ResultPath": "$.settledTickets",
-            "Retry": [
+        "SettleTickets": {
+            "Type": "Parallel",
+            "ResultPath": "$.settleResults",
+            "Branches": [
                 {
-                    "ErrorEquals": [
-                        "States.TaskFailed"
-                    ],
-                    "IntervalSeconds": 2,
-                    "MaxAttempts": 3,
-                    "BackoffRate": 2
+                    "StartAt": "UpdateTicketsKeno4min",
+                    "States": {
+                        "UpdateTicketsKeno4min": {
+                            "Type": "Task",
+                            "Resource": "${UpdateTicketsKeno4minFunctionArn}",
+                            "Parameters": {
+                                "game.$": "$.game"
+                            },
+                            "Retry": [
+                                {
+                                    "ErrorEquals": [
+                                        "States.TaskFailed"
+                                    ],
+                                    "IntervalSeconds": 2,
+                                    "MaxAttempts": 3,
+                                    "BackoffRate": 2
+                                }
+                            ],
+                            "End": true
+                        }
+                    }
+                },
+                {
+                    "StartAt": "UpdateTicketsCore",
+                    "States": {
+                        "UpdateTicketsCore": {
+                            "Type": "Task",
+                            "Resource": "${UpdateTicketsCoreFunctionArn}",
+                            "Parameters": {
+                                "game.$": "$.game"
+                            },
+                            "Retry": [
+                                {
+                                    "ErrorEquals": [
+                                        "States.TaskFailed"
+                                    ],
+                                    "IntervalSeconds": 2,
+                                    "MaxAttempts": 3,
+                                    "BackoffRate": 2
+                                }
+                            ],
+                            "End": true
+                        }
+                    }
                 }
             ],
             "Catch": [

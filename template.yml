@@ -78,11 +78,11 @@ Resources:
     Metadata:
       BuildMethod: makefile
 
-  UpdateTicketsFunction:
+  UpdateTicketsKeno4minFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub "${Stage}-lottery-update-tickets"
-      CodeUri: functions/update-tickets/
+      FunctionName: !Sub "${Stage}-lottery-update-tickets-keno4min"
+      CodeUri: functions/update-tickets-keno4min/
       Handler: bootstrap
       Runtime: provided.al2023
       Timeout: 30
@@ -91,6 +91,32 @@ Resources:
         Variables:
           MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
           STAGE: !Ref Stage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
+    Metadata:
+      BuildMethod: makefile
+
+  # Resuelve los tickets en la base del microservicio core (misma cluster, otra
+  # DB). Corre en paralelo con UpdateTicketsKeno4min tras el sorteo.
+  UpdateTicketsCoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${Stage}-lottery-update-tickets-core"
+      CodeUri: functions/update-tickets-core/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Timeout: 30
+      MemorySize: 1024
+      Environment:
+        Variables:
+          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
+          STAGE: !Ref Stage
+          CORE_DATABASE_NAME: core
+          CORE_TICKETS_COLLECTION: tickets
       Policies:
         - Statement:
             - Effect: Allow
@@ -131,7 +157,8 @@ Resources:
         CreateGameFunctionArn: !GetAtt CreateGameFunction.Arn
         CloseBetsFunctionArn: !GetAtt CloseBetsFunction.Arn
         DrawBallsFunctionArn: !GetAtt DrawBallsFunction.Arn
-        UpdateTicketsFunctionArn: !GetAtt UpdateTicketsFunction.Arn
+        UpdateTicketsKeno4minFunctionArn: !GetAtt UpdateTicketsKeno4minFunction.Arn
+        UpdateTicketsCoreFunctionArn: !GetAtt UpdateTicketsCoreFunction.Arn
         ProcessJackpotFunctionArn: !GetAtt ProcessJackpotFunction.Arn
         DomainEventBusName: !Ref DomainEventBusName
       Policies:
@@ -142,7 +169,9 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref DrawBallsFunction
         - LambdaInvokePolicy:
-            FunctionName: !Ref UpdateTicketsFunction
+            FunctionName: !Ref UpdateTicketsKeno4minFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateTicketsCoreFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref ProcessJackpotFunction
         - EventBridgePutEventsPolicy:
