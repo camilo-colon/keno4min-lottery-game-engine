@@ -6,6 +6,36 @@ import (
 	"github.com/cronos/keno4min-lottery-game-engine/functions/process-jackpot/internal/domain"
 )
 
+func TestTicketAwardJackpot(t *testing.T) {
+	tests := []struct {
+		name  string
+		state domain.TicketState
+	}{
+		{
+			name:  "el ticket no tenía premio: gana el pozo y pasa a cobrable",
+			state: domain.LOSS,
+		},
+		{
+			name:  "el ticket ya tenía premio: sigue cobrable con el pozo sumado",
+			state: domain.WINNING,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ticket := domain.Ticket{ID: "t1", State: tt.state}
+
+			ticket.AwardJackpot(25_000_000)
+
+			if ticket.Jackpot != 25_000_000 {
+				t.Errorf("Jackpot = %d, want 25000000", ticket.Jackpot)
+			}
+			if ticket.State != domain.WINNING {
+				t.Errorf("State = %q, want WINNING", ticket.State)
+			}
+		})
+	}
+}
+
 func TestTicketHouseProfit(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -14,10 +14,10 @@ var (
 
 // Ticket representa una jugada de un cliente en un juego.
 type Ticket struct {
-	ID    string      `bson:"_id,omitempty" json:"id"`
-	Round int64       `bson:"round" json:"round"`
-	Cupon string      `bson:"cupon" json:"cupon"`
-	State TicketState `bson:"state" json:"state"`
+	ID     string      `bson:"_id,omitempty" json:"id"`
+	Round  int64       `bson:"round" json:"round"`
+	Coupon string      `bson:"coupon" json:"coupon"`
+	State  TicketState `bson:"state" json:"state"`
 	// Win es el payout ya calculado y persistido por la Lambda update-tickets
 	// (corre entre DrawBalls y ProcessJackpot).
 	Win int64 `bson:"win" json:"win"`
@@ -47,4 +47,17 @@ type Bet struct {
 // ser negativa (el jugador ganó más de lo que apostó).
 func (t Ticket) HouseProfit() int64 {
 	return t.Total - t.Win
+}
+
+// AwardJackpot le asigna al ticket el pozo ganado y lo deja cobrable.
+//
+// Marcar WINNING es parte del premio, no un detalle: update-tickets deriva el
+// estado ÚNICAMENTE de Win (WINNING si win > 0, LOSS si no) y corre ANTES del
+// sorteo del pozo, cuando el jackpot todavía no existe. Un ticket sin aciertos
+// que gana el pozo llega acá en LOSS; si solo escribiéramos el monto quedaría
+// LOSS con jackpot asignado: un premio impagable, porque la caja solo cobra
+// tickets WINNING.
+func (t *Ticket) AwardJackpot(amount int64) {
+	t.Jackpot = amount
+	t.State = WINNING
 }

@@ -14,7 +14,7 @@ type JackpotAward struct {
 	ClubID    string    `bson:"club_id" json:"clubId"`
 	GameID    string    `bson:"game_id" json:"gameId"`
 	TicketID  string    `bson:"ticket_id" json:"ticketId"`
-	Cupon     string    `bson:"cupon" json:"cupon"`
+	Coupon    string    `bson:"coupon" json:"coupon"`
 	Round     int64     `bson:"round" json:"round"`
 	Value     int64     `bson:"value" json:"value"`
 	CreatedAt time.Time `bson:"created_at" json:"createdAt"`
@@ -28,7 +28,7 @@ func NewJackpotAward(winner Ticket, value int64) JackpotAward {
 		ClubID:    winner.ClubID,
 		GameID:    winner.GameID,
 		TicketID:  winner.ID,
-		Cupon:     winner.Cupon,
+		Coupon:    winner.Coupon,
 		Round:     winner.Round,
 		Value:     value,
 		CreatedAt: time.Now().UTC(),

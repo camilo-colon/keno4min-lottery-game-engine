@@ -88,8 +88,11 @@ func TestProcessClubIncrementsWithoutPlaying(t *testing.T) {
 }
 
 func TestProcessClubPlaysJackpot(t *testing.T) {
-	winner := losingTicket("t1", domain.PAYED, 1_000_000) // utilidad +1M
-	winner.Cupon = "ABC123"
+	// Ganador sin aciertos: update-tickets lo dejó en LOSS. Es el caso más común
+	// —la mayoría de tickets pierde— y el que exige que ganar el pozo lo vuelva
+	// WINNING, o el premio queda impagable.
+	winner := losingTicket("t1", domain.LOSS, 1_000_000) // utilidad +1M
+	winner.Coupon = "ABC123"
 	winner.Round = 42
 	winner.GameID = "g1"
 	winner.ClubID = "c1"
@@ -116,11 +119,15 @@ func TestProcessClubPlaysJackpot(t *testing.T) {
 	if tickets.assignCalls != 1 {
 		t.Fatalf("assignCalls = %d, want 1", tickets.assignCalls)
 	}
-	if tickets.assignedTo != "t1" {
-		t.Errorf("ganador = %q, want t1", tickets.assignedTo)
+	if tickets.assignedTicket.ID != "t1" {
+		t.Errorf("ganador = %q, want t1", tickets.assignedTicket.ID)
 	}
-	if tickets.assignedAmount != 25_000_000 {
-		t.Errorf("premio asignado = %d, want 25000000 (jackpot.Value)", tickets.assignedAmount)
+	if tickets.assignedTicket.Jackpot != 25_000_000 {
+		t.Errorf("premio asignado = %d, want 25000000 (jackpot.Value)", tickets.assignedTicket.Jackpot)
+	}
+	// Sin esto el ticket queda con el pozo asignado pero incobrable.
+	if tickets.assignedTicket.State != domain.WINNING {
+		t.Errorf("estado del ganador = %q, want WINNING", tickets.assignedTicket.State)
 	}
 
 	// Registra el premio en el histórico con los datos del ganador.
@@ -129,8 +136,8 @@ func TestProcessClubPlaysJackpot(t *testing.T) {
 	}
 	got := awards.recorded
 	if got.ClubID != "c1" || got.GameID != "g1" || got.TicketID != "t1" ||
-		got.Cupon != "ABC123" || got.Round != 42 || got.Value != 25_000_000 {
-		t.Errorf("award registrado = %+v, want club=c1 game=g1 ticket=t1 cupon=ABC123 round=42 value=25000000", got)
+		got.Coupon != "ABC123" || got.Round != 42 || got.Value != 25_000_000 {
+		t.Errorf("award registrado = %+v, want club=c1 game=g1 ticket=t1 coupon=ABC123 round=42 value=25000000", got)
 	}
 
 	// Resetea el jp1 con la config y el target aleatorio.

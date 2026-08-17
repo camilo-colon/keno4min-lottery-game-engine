@@ -190,7 +190,7 @@ func TestJackpotAwardStoreRecord(t *testing.T) {
 	}
 
 	store := adapters.NewJackpotAwardStore(testDB)
-	winner := domain.Ticket{ID: "t1", Cupon: "ABC123", Round: 42, GameID: "g1", ClubID: "A"}
+	winner := domain.Ticket{ID: "t1", Coupon: "ABC123", Round: 42, GameID: "g1", ClubID: "A"}
 	award := domain.NewJackpotAward(winner, 25_000_000)
 
 	if err := store.Record(ctx, award); err != nil {
@@ -202,7 +202,7 @@ func TestJackpotAwardStoreRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.ClubID != "A" || got.GameID != "g1" || got.TicketID != "t1" ||
-		got.Cupon != "ABC123" || got.Round != 42 || got.Value != 25_000_000 {
+		got.Coupon != "ABC123" || got.Round != 42 || got.Value != 25_000_000 {
 		t.Errorf("award persistido = %+v", got)
 	}
 }
@@ -218,7 +218,7 @@ func TestAwardRollback(t *testing.T) {
 	store := adapters.NewJackpotAwardStore(testDB)
 	tm := adapters.NewMongoTransactionManager(testClient)
 
-	winner := domain.Ticket{ID: "t1", Cupon: "X", Round: 1, GameID: "g1", ClubID: "A"}
+	winner := domain.Ticket{ID: "t1", Coupon: "X", Round: 1, GameID: "g1", ClubID: "A"}
 	boom := errors.New("boom")
 
 	err := tm.WithinTransaction(ctx, func(txCtx context.Context) error {

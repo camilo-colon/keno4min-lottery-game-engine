@@ -70,8 +70,7 @@ type fakeTickets struct {
 	ticketsErr     error
 	assignErr      error
 	assignCalls    int
-	assignedTo     string
-	assignedAmount int64
+	assignedTicket domain.Ticket
 }
 
 func (f *fakeTickets) FindClubIDsByGame(ctx context.Context, gameID string) ([]string, error) {
@@ -82,10 +81,9 @@ func (f *fakeTickets) FindByClubAndGame(ctx context.Context, clubID, gameID stri
 	return f.tickets, f.ticketsErr
 }
 
-func (f *fakeTickets) AssignJackpot(ctx context.Context, ticketID string, amount int64) error {
+func (f *fakeTickets) AssignJackpot(ctx context.Context, ticket domain.Ticket) error {
 	f.assignCalls++
-	f.assignedTo = ticketID
-	f.assignedAmount = amount
+	f.assignedTicket = ticket
 	return f.assignErr
 }
 

@@ -18,7 +18,7 @@ var (
 type Ticket struct {
 	ID        string      `bson:"_id,omitempty" json:"id"`
 	Round     int64       `bson:"round" json:"round"`
-	Cupon     string      `bson:"cupon" json:"cupon"`
+	Coupon    string      `bson:"coupon" json:"coupon"`
 	State     TicketState `bson:"state" json:"state"`
 	Win       int64       `bson:"win" json:"win"`
 	Jackpot   int64       `bson:"jackpot" json:"jackpot"`

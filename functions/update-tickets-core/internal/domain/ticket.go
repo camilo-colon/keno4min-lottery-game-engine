@@ -29,7 +29,7 @@ type Ticket struct {
 	GameID    string      `bson:"game_id" json:"gameId"`
 	ClubID    string      `bson:"club_id" json:"clubId"`
 	AdminID   string      `bson:"admin_id" json:"adminId"`
-	Cupon     string      `bson:"cupon" json:"cupon"`
+	Coupon    string      `bson:"coupon" json:"coupon"`
 	State     TicketState `bson:"state" json:"state"`
 	Win       int64       `bson:"win" json:"win"`
 	Jackpot   int64       `bson:"jackpot" json:"jackpot"`

@@ -9,7 +9,7 @@ import (
 func TestNewJackpotAward(t *testing.T) {
 	winner := domain.Ticket{
 		ID:     "t1",
-		Cupon:  "ABC123",
+		Coupon: "ABC123",
 		Round:  42,
 		GameID: "g1",
 		ClubID: "c1",
@@ -26,8 +26,8 @@ func TestNewJackpotAward(t *testing.T) {
 	if award.TicketID != "t1" {
 		t.Errorf("TicketID = %q, want t1", award.TicketID)
 	}
-	if award.Cupon != "ABC123" {
-		t.Errorf("Cupon = %q, want ABC123", award.Cupon)
+	if award.Coupon != "ABC123" {
+		t.Errorf("Coupon = %q, want ABC123", award.Coupon)
 	}
 	if award.Round != 42 {
 		t.Errorf("Round = %d, want 42", award.Round)

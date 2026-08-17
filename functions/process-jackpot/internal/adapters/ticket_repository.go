@@ -53,13 +53,14 @@ func (r *TicketStore) FindByClubAndGame(ctx context.Context, clubID, gameID stri
 	return tickets, nil
 }
 
-// AssignJackpot asigna el premio del pozo al ticket ganador.
-func (r *TicketStore) AssignJackpot(ctx context.Context, ticketID string, amount int64) error {
-	filter := bson.M{"_id": ticketID}
-	update := bson.M{"$set": bson.M{"jackpot": amount}}
+// AssignJackpot persiste el premio del pozo del ticket ganador: el monto y el
+// estado que le dejó Ticket.AwardJackpot.
+func (r *TicketStore) AssignJackpot(ctx context.Context, ticket domain.Ticket) error {
+	filter := bson.M{"_id": ticket.ID}
+	update := bson.M{"$set": bson.M{"jackpot": ticket.Jackpot, "state": ticket.State}}
 
 	if _, err := r.collection.UpdateOne(ctx, filter, update); err != nil {
-		return fmt.Errorf("error assigning jackpot to ticket %s: %w", ticketID, err)
+		return fmt.Errorf("error assigning jackpot to ticket %s: %w", ticket.ID, err)
 	}
 	return nil
 }

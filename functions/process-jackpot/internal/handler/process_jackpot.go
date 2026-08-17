@@ -119,7 +119,10 @@ func (h *ProcessJackpotHandler) playJackpot(ctx context.Context, clubID string, 
 	}
 	winner := tickets[h.rng.Intn(len(tickets))]
 
-	if err := h.tickets.AssignJackpot(ctx, winner.ID, jackpot.Value); err != nil {
+	// El dominio decide qué implica ganar el pozo (monto + estado cobrable); el
+	// puerto solo lo persiste.
+	winner.AwardJackpot(jackpot.Value)
+	if err := h.tickets.AssignJackpot(ctx, winner); err != nil {
 		return err
 	}
 

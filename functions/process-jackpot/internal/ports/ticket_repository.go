@@ -17,6 +17,9 @@ type TicketRepository interface {
 	FindClubIDsByGame(ctx context.Context, gameID string) ([]string, error)
 	// FindByClubAndGame devuelve los tickets NO cancelados de un club en un juego.
 	FindByClubAndGame(ctx context.Context, clubID, gameID string) ([]domain.Ticket, error)
-	// AssignJackpot asigna el premio del pozo al ticket ganador.
-	AssignJackpot(ctx context.Context, ticketID string, amount int64) error
+	// AssignJackpot persiste el premio del pozo del ticket ganador: el monto y el
+	// estado, tal como los deja Ticket.AwardJackpot. El estado viaja con el
+	// ticket porque ganar el pozo lo vuelve cobrable, y esa derivación es una
+	// regla de dominio, no del store.
+	AssignJackpot(ctx context.Context, ticket domain.Ticket) error
 }
