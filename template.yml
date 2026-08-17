@@ -10,11 +10,6 @@ Parameters:
       - staging
       - prod
     Description: Deployment stage
-  DomainEventBusName:
-    Type: String
-    Default: cronos.domain_events
-    Description: EventBridge event bus for domain events
-
 Resources:
   CreateGameFunction:
     Type: AWS::Serverless::Function
@@ -143,7 +138,6 @@ Resources:
         UpdateTicketsKeno4minFunctionArn: !GetAtt UpdateTicketsKeno4minFunction.Arn
         UpdateTicketsCoreFunctionArn: !GetAtt UpdateTicketsCoreFunction.Arn
         ProcessJackpotFunctionArn: !GetAtt ProcessJackpotFunction.Arn
-        DomainEventBusName: !Ref DomainEventBusName
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref CreateGameFunction
@@ -155,9 +149,6 @@ Resources:
             FunctionName: !Ref UpdateTicketsCoreFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref ProcessJackpotFunction
-        - EventBridgePutEventsPolicy:
-            EventBusName: !Ref DomainEventBusName
-
   GameScheduleRule:
     Type: AWS::Events::Rule
     Properties:

@@ -144,46 +144,6 @@
                     "Next": "HandleError"
                 }
             ],
-            "Next": "PublishGamePlayed"
-        },
-        "PublishGamePlayed": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::events:putEvents",
-            "Parameters": {
-                "Entries": [
-                    {
-                        "EventBusName": "${DomainEventBusName}",
-                        "Source": "cronos.keno4min",
-                        "DetailType": "cronos.keno4min.game.played",
-                        "Detail": {
-                            "event_id.$": "States.UUID()",
-                            "type": "cronos.keno4min.game.played",
-                            "ocurred_on.$": "$$.State.EnteredTime",
-                            "aggregate_id.$": "$.game.id",
-                            "attributes.$": "$.game"
-                        }
-                    }
-                ]
-            },
-            "ResultPath": null,
-            "Retry": [
-                {
-                    "ErrorEquals": [
-                        "States.TaskFailed"
-                    ],
-                    "IntervalSeconds": 2,
-                    "MaxAttempts": 3,
-                    "BackoffRate": 2
-                }
-            ],
-            "Catch": [
-                {
-                    "ErrorEquals": [
-                        "States.ALL"
-                    ],
-                    "Next": "HandleError"
-                }
-            ],
             "Next": "Success"
         },
         "Success": {
