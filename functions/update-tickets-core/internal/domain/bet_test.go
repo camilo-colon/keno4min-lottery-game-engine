@@ -38,16 +38,16 @@ func TestBetPayout(t *testing.T) {
 			want:  35_000, // 10000 * 350 / 100
 		},
 		{
-			name:  "2 números, 1 acierto paga factor 10",
+			name:  "2 números, 1 acierto paga factor 100",
 			bet:   domain.Bet{Money: 50000, Nums: []int64{7, 9}},
 			balls: mask(7, 40),
-			want:  5_000, // 50000 * 10 / 100
+			want:  50_000, // 50000 * 100 / 100
 		},
 		{
-			name:  "2 números, 2 aciertos paga factor 100",
+			name:  "2 números, 2 aciertos paga factor 1000",
 			bet:   domain.Bet{Money: 50000, Nums: []int64{7, 9}},
 			balls: mask(7, 9),
-			want:  50_000, // 50000 * 100 / 100
+			want:  500_000, // 50000 * 1000 / 100
 		},
 		{
 			name:  "trunca los centavos del pago",

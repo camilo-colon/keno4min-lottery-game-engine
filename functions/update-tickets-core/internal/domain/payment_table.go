@@ -6,7 +6,7 @@ package domain
 //   - valor: factor de pago aplicado al monto apostado
 var PaymentTable = map[int][]int64{
 	1:  {0, 350},
-	2:  {0, 10, 100},
+	2:  {0, 100, 1000},
 	3:  {0, 0, 200, 5000},
 	4:  {0, 0, 100, 1000, 10000},
 	5:  {0, 0, 100, 300, 2000, 15000},
