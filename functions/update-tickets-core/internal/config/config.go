@@ -47,13 +47,13 @@ func (c *Config) loadFromSecretsManager(ctx context.Context, secretName string) 
 		return fmt.Errorf("failed to create secrets manager: %w", err)
 	}
 
-	creds, err := manager.GetMongoDBCredentials(ctx, secretName)
+	mongoURI, err := manager.GetSecret(ctx, secretName)
 	if err != nil {
-		return fmt.Errorf("failed to get MongoDB credentials: %w", err)
+		return fmt.Errorf("failed to get MongoDB connection string: %w", err)
 	}
 
-	c.MongoURI = creds.URI
-	c.DatabaseName = creds.Database
+	c.MongoURI = mongoURI
+	c.DatabaseName = getEnv("DATABASE_NAME", "lottery")
 	return nil
 }
 

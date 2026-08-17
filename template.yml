@@ -27,6 +27,7 @@ Resources:
         Variables:
           MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
           STAGE: !Ref Stage
+          DATABASE_NAME: keno4min
       Policies:
         - Statement:
             - Effect: Allow
@@ -49,6 +50,7 @@ Resources:
         Variables:
           MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
           STAGE: !Ref Stage
+          DATABASE_NAME: keno4min
       Policies:
         - Statement:
             - Effect: Allow
@@ -71,6 +73,7 @@ Resources:
         Variables:
           MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
           STAGE: !Ref Stage
+          DATABASE_NAME: keno4min
       Policies:
         - Statement:
             - Effect: Allow
@@ -119,6 +122,7 @@ Resources:
         Variables:
           MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
           STAGE: !Ref Stage
+          DATABASE_NAME: keno4min
       Policies:
         - Statement:
             - Effect: Allow

@@ -34,14 +34,14 @@ func loadFromSecretsManager(ctx context.Context, secretName, stage string) (*Con
 		return nil, fmt.Errorf("failed to create secrets manager: %w", err)
 	}
 
-	creds, err := manager.GetMongoDBCredentials(ctx, secretName)
+	mongoURI, err := manager.GetSecret(ctx, secretName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get MongoDB credentials: %w", err)
+		return nil, fmt.Errorf("failed to get MongoDB connection string: %w", err)
 	}
 
 	return &Config{
-		MongoURI:     creds.URI,
-		DatabaseName: creds.Database,
+		MongoURI:     mongoURI,
+		DatabaseName: getEnv("DATABASE_NAME", "lottery"),
 		Stage:        stage,
 	}, nil
 }
