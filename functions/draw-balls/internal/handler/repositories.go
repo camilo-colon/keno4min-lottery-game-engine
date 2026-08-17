@@ -17,8 +17,3 @@ type GameRepository interface {
 type DrawRepository interface {
 	GetRandomKeno4MinDraw(ctx context.Context) (*domain.Draws, error)
 }
-
-type TicketRepository interface {
-	GetStats(ctx context.Context) (*domain.Stats, error)
-	GetTicketsByGame(ctx context.Context, gameID string) ([]domain.Ticket, error)
-}

@@ -33,9 +33,8 @@ func lambdaHandler(ctx context.Context, input EventInput) (*domain.Game, error) 
 	// Inicializar repositories
 	gameStore := repository.NewGameStore(db.DB)
 	drawStore := repository.NewDrawStore(db.Client)
-	ticketStore := repository.NewTicketStore(db.DB)
 
-	handler := handler.NewDrawBallsHandler(gameStore, drawStore, ticketStore)
+	handler := handler.NewDrawBallsHandler(gameStore, drawStore)
 	game, err := handler.Handle(ctx, input.GameID)
 	if err != nil {
 		return nil, fmt.Errorf("error handling draw balls: %w", err)
