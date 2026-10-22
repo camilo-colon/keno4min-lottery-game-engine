@@ -1,181 +1,72 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
+Description: Keno4min Draw Engine - creacion de sorteos con DynamoDB
 
 Parameters:
-  Stage:
+  DynamoDBTableName:
     Type: String
-    Default: dev
+    Default: cronos-dev-keno4min
+    Description: Nombre de la tabla DynamoDB existente (PK y SK de tipo String)
+
+  ScheduleState:
+    Type: String
+    Default: ENABLED
     AllowedValues:
-      - dev
-      - staging
-      - prod
-    Description: Deployment stage
+      - ENABLED
+      - DISABLED
+    Description: Habilita o deshabilita la ejecucion automatica del workflow
+
 Resources:
-  CreateGameFunction:
+  CreateDrawFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
     Properties:
-      FunctionName: !Sub "${Stage}-lottery-create-game"
-      CodeUri: functions/create-game/
+      CodeUri: functions/create-draw/
       Handler: bootstrap
       Runtime: provided.al2023
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 15
       Environment:
         Variables:
-          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
-          STAGE: !Ref Stage
-          DATABASE_NAME: keno4min
+          DYNAMODB_TABLE: !Ref DynamoDBTableName
       Policies:
         - Statement:
             - Effect: Allow
               Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
-    Metadata:
-      BuildMethod: makefile
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
 
-  DrawBallsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "${Stage}-lottery-draw-balls"
-      CodeUri: functions/draw-balls/
-      Handler: bootstrap
-      Runtime: provided.al2023
-      Timeout: 30
-      MemorySize: 1024
-      Environment:
-        Variables:
-          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
-          STAGE: !Ref Stage
-          DATABASE_NAME: keno4min
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
-    Metadata:
-      BuildMethod: makefile
-
-  UpdateTicketsKeno4minFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "${Stage}-lottery-update-tickets-keno4min"
-      CodeUri: functions/update-tickets-keno4min/
-      Handler: bootstrap
-      Runtime: provided.al2023
-      Timeout: 30
-      MemorySize: 1024
-      Environment:
-        Variables:
-          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
-          STAGE: !Ref Stage
-          DATABASE_NAME: keno4min
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
-    Metadata:
-      BuildMethod: makefile
-
-  # Resuelve los tickets en la base del microservicio core (misma cluster, otra
-  # DB). Corre en paralelo con UpdateTicketsKeno4min tras el sorteo.
-  UpdateTicketsCoreFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "${Stage}-lottery-update-tickets-core"
-      CodeUri: functions/update-tickets-core/
-      Handler: bootstrap
-      Runtime: provided.al2023
-      Timeout: 30
-      MemorySize: 1024
-      Environment:
-        Variables:
-          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
-          STAGE: !Ref Stage
-          CORE_DATABASE_NAME: core
-          CORE_TICKETS_COLLECTION: tickets
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
-    Metadata:
-      BuildMethod: makefile
-
-  ProcessJackpotFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "${Stage}-lottery-process-jackpot"
-      CodeUri: functions/process-jackpot/
-      Handler: bootstrap
-      Runtime: provided.al2023
-      Timeout: 30
-      MemorySize: 1024
-      Environment:
-        Variables:
-          MONGODB_SECRET_NAME: !Sub "/keno4min/${Stage}/mongodb"
-          STAGE: !Ref Stage
-          DATABASE_NAME: keno4min
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/keno4min/${Stage}/mongodb-*"
-    Metadata:
-      BuildMethod: makefile
-
-  GameWorkflowStateMachine:
+  GameWorkflow:
     Type: AWS::Serverless::StateMachine
     Properties:
       Type: STANDARD
       DefinitionUri: statemachine/game-workflow.asl.json
       DefinitionSubstitutions:
-        CreateGameFunctionArn: !GetAtt CreateGameFunction.Arn
-        DrawBallsFunctionArn: !GetAtt DrawBallsFunction.Arn
-        UpdateTicketsKeno4minFunctionArn: !GetAtt UpdateTicketsKeno4minFunction.Arn
-        UpdateTicketsCoreFunctionArn: !GetAtt UpdateTicketsCoreFunction.Arn
-        ProcessJackpotFunctionArn: !GetAtt ProcessJackpotFunction.Arn
+        CreateDrawFunctionArn: !GetAtt CreateDrawFunction.Arn
       Policies:
         - LambdaInvokePolicy:
-            FunctionName: !Ref CreateGameFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref DrawBallsFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref UpdateTicketsKeno4minFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref UpdateTicketsCoreFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref ProcessJackpotFunction
-  GameScheduleRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub "${Stage}-lottery-game-schedule"
-      Description: Trigger new lottery game every 3 minutes
-      ScheduleExpression: "rate(3 minutes)"
-      State: ENABLED
-      Targets:
-        - Id: GameWorkflowTarget
-          Arn: !GetAtt GameWorkflowStateMachine.Arn
-          RoleArn: !GetAtt EventBridgeToStepFunctionsRole.Arn
+            FunctionName: !Ref CreateDrawFunction
+      Events:
+        EveryThreeMinutes:
+          Type: ScheduleV2
+          Properties:
+            Description: Inicia el flujo cada 3 minutos
+            ScheduleExpression: rate(3 minutes)
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            State: !Ref ScheduleState
+            OmitName: true
+            Input: '{"requestId":"<aws.scheduler.schedule-arn>#<aws.scheduler.scheduled-time>"}'
 
-  EventBridgeToStepFunctionsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: events.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: StartStateMachine
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: states:StartExecution
-                Resource: !GetAtt GameWorkflowStateMachine.Arn
+Outputs:
+  GameWorkflowArn:
+    Description: ARN de la Step Function
+    Value: !Ref GameWorkflow
+  CreateDrawFunctionArn:
+    Description: ARN de la Lambda create-draw
+    Value: !GetAtt CreateDrawFunction.Arn
