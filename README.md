@@ -6,11 +6,14 @@ Proyecto AWS SAM que crea sorteos en una tabla DynamoDB existente.
 EventBridge Scheduler (cada 3 minutos)
   └── GameWorkflow (Step Functions STANDARD)
         ├── CreateDrawFunction (Go, provided.al2023, ARM64)
-        └── WaitUntilClosesAt (TimestampPath: $.closesAt)
+        ├── WaitUntilClosesAt (TimestampPath: $.closesAt)
+        └── DrawVideoFunction (Go, provided.al2023, ARM64)
 ```
 
-El workflow entrega el resultado de la Lambda al estado Wait y termina al llegar
-a `closesAt`. Los pasos `draw → update_tickets` todavía están pendientes.
+El workflow entrega el resultado de create-draw al estado Wait. Al llegar a
+`closesAt`, invoca draw-video, que selecciona un video al azar y actualiza
+`balls` y `videoId` del sorteo en DynamoDB. El workflow termina con el draw
+actualizado. `update_tickets` todavía está pendiente.
 La espera ocurre en Step Functions, sin mantener una Lambda ejecutándose.
 Si la fecha ya pasó, continúa inmediatamente. El estado Wait tiene precisión de
 segundos y trunca las fracciones del timestamp.
@@ -35,6 +38,80 @@ functions/create-draw/
 Las pruebas viven junto al código. `draw` depende únicamente de la biblioteca
 estándar, incluido el paquete `uuid`; `dynamodb` implementa su contrato. `main.go` construye el cliente
 AWS una vez y adapta la entrada de Lambda. No se necesita un contenedor de inyección.
+
+`functions/draw-video/` es un módulo Go independiente con su handler en
+`cmd/lambda/main.go` y un Makefile que construye `bootstrap` para Linux ARM64.
+El handler recibe el draw creado por create-draw, ejecuta el caso de uso
+`DrawVideo` y devuelve el draw actualizado. Configura un único cliente DynamoDB
+durante la inicialización y lo comparte entre los adaptadores de draw y video.
+Requiere `DYNAMODB_TABLE`, configurada por el parámetro SAM `DynamoDBTableName`.
+Su rol permite únicamente Query y UpdateItem sobre esa tabla. Los errores se
+registran y se propagan a Step Functions. Step Functions tiene permiso de
+invocar ambas Lambdas y reintenta los errores transitorios del servicio Lambda.
+
+El código de draw-video está organizado por módulos:
+
+```text
+functions/draw-video/internal/
+├── draw/
+│   ├── domain/draw.go
+│   ├── ports/repository.go
+│   ├── usecases/draw_video.go
+│   └── adapters/dynamodb/
+│       ├── item.go
+│       ├── repository.go
+│       └── repository_test.go
+└── video/
+    ├── domain/video.go
+    ├── ports/repository.go
+    └── adapters/dynamodb/
+        ├── item.go
+        ├── repository.go
+        └── repository_test.go
+```
+
+Cada módulo contiene su dominio, sus puertos y sus adaptadores. Los puertos
+dependen del dominio y los adaptadores implementan `ports.Repository`. Ambos
+adaptadores exponen `Repository` y `NewRepository(client, tableName)` y reciben
+directamente `*dynamodb.Client`.
+
+El dominio de video define `Video` (`id` y `balls`) y el constructor
+`New(id, balls)`. Su puerto `Repository.GetAll(ctx) ([]Video, error)` se
+implementa mediante una Query por `PK = VIDEO`, con `SK` e `id` de tipo
+String y `balls` como lista de números. Recorre todas las páginas, conserva el
+orden de las bolas y devuelve una lista vacía si no hay videos. Los errores de
+consulta o decodificación se propagan sin devolver resultados parciales.
+El adaptador recibe el cliente DynamoDB y el nombre de la tabla por constructor.
+
+El dominio del módulo draw contiene la misma entidad `Draw` y el
+constructor de create-draw, con fechas UTC y una ventana de 157 segundos.
+`Draw.AssignVideo(videoID, balls)` asigna el video y copia las bolas para evitar
+compartir su slice con el catálogo. El caso de uso aplica este método a una copia
+del draw antes de persistirla, conservando la entrada si falla el guardado.
+Su puerto `Repository.Update(ctx, *Draw)` se implementa en
+el adaptador DynamoDB del módulo draw.
+`item.go` define el formato de `latestResult` y su conversión desde el dominio.
+`Update` serializa ese formato y ejecuta la transacción; los métodos privados
+`updateDraw` y `updateRuntime` construyen sus dos operaciones.
+Una transacción actualiza `balls` y `videoId` en `DRAW#<id> / META` y publica
+`latestResult` en `DRAW_RUNTIME / META`, conservando `current` y los demás
+atributos. Ambas actualizaciones se realizan sin condiciones de existencia o
+comparación de TIR. Si el sorteo no existe, se crea con sus claves, `balls` y
+`videoId`; si existe, sus demás atributos se conservan.
+`latestResult` contiene `drawId`, `tir`, `balls` y `videoId` y se reemplaza sin
+comparar el TIR publicado, incluso si el recibido es anterior. Si el registro de
+runtime no existe, se crea con `latestResult`. Los errores cancelan la
+transacción y se propagan sin realizar una escritura alternativa.
+Los permisos Query y UpdateItem de la Lambda cubren estas operaciones.
+
+El caso de uso `draw/usecases.DrawVideo`, construido con
+`NewDrawVideo(drawRepository, videoRepository)`, expone
+`Execute(ctx, *Draw) (*Draw, error)`. Consulta todos los videos, selecciona uno
+uniformemente con `crypto/rand` y persiste sus `balls` e `id` como `videoId` del
+sorteo. Devuelve una copia del draw actualizado después del guardado, conservando
+los demás campos. Si el catálogo está vacío devuelve `ErrNoVideos`; los errores
+de lectura y escritura se propagan. El handler invoca este caso de uso en cada
+ejecución. Cada ejecución realiza una selección nueva.
 
 `Create.Execute` sigue cuatro pasos:
 
@@ -135,7 +212,7 @@ deberán implementar su propia protección frente a duplicados.
 
 ## Validación
 
-Desde `functions/create-draw/`:
+Desde `functions/create-draw/` y `functions/draw-video/`:
 
 ```sh
 go test -race ./...
@@ -169,14 +246,42 @@ Sin `DYNAMODB_INTEGRATION=1`, se omite la integración. La prueba solo conecta a
 Verifica idempotencia, concurrencia, TIR únicos, conservación de `latestResult`,
 rollback del guardado, contadores inválidos y protección contra retrocesos del runtime.
 
+Para comprobar la transacción de draw-video con DynamoDB Local:
+
+```sh
+docker run --rm -d --name keno4min-draw-video-test \
+  -p 127.0.0.1:18074:8000 amazon/dynamodb-local \
+  -jar DynamoDBLocal.jar -inMemory -sharedDb
+cd functions/draw-video
+DYNAMODB_INTEGRATION=1 go test -race ./internal/draw/adapters/dynamodb -run TestDynamoDBIntegration -count=1 -v
+docker stop keno4min-draw-video-test
+```
+
+Esta prueba usa credenciales ficticias y una tabla temporal que elimina al
+terminar. Verifica conservación de `current`, reemplazo de `latestResult` con
+cualquier TIR y creación de registros ausentes. También comprueba que un TIR
+recibido diferente no impide actualizar el sorteo ni modifica su atributo `tir`.
+Sin `DYNAMODB_INTEGRATION=1` se omite.
+
 ## Invocación y despliegue
 
 ```sh
 sam local invoke CreateDrawFunction --event events/create-draw.json
 ```
 
-La invocación SAM usa las credenciales AWS disponibles y **escribe en la tabla
+La invocación de create-draw usa las credenciales AWS disponibles y **escribe en la tabla
 configurada**. Para pruebas sin AWS, usar la integración local anterior.
+
+Para invocar draw-video (requiere Docker activo y credenciales AWS):
+
+```sh
+sam local invoke DrawVideoFunction --event events/draw-video.json
+```
+
+Esta invocación consulta los videos y **actualiza el sorteo en la tabla
+configurada**. El draw del evento debe existir en `DRAW#<id> / META` y el catálogo
+debe contener al menos un registro con `PK = VIDEO`. La salida conserva los
+campos del draw y añade las `balls` y el `videoId` seleccionados.
 
 `samconfig.toml` define dos stacks independientes:
 
