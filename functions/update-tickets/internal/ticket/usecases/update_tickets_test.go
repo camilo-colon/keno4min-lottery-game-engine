@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	ticket "github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/domain"
@@ -42,10 +43,10 @@ func TestExecuteSettlesOnlyPendingTickets(t *testing.T) {
 	if updated != 2 || len(repo.updated) != 2 {
 		t.Fatalf("updated %d tickets, saved %d", updated, len(repo.updated))
 	}
-	if got := repo.updated[0]; got.ID != "win" || got.Status != ticket.StatusWinning || got.PrizeCents != 3500 {
+	if got := repo.updated[0]; got.ID != "win" || got.Status != ticket.StatusWinning || got.PrizeCents != 3500 || !slices.Equal(got.Balls, balls) {
 		t.Fatalf("unexpected winning ticket: %+v", got)
 	}
-	if got := repo.updated[1]; got.ID != "lost" || got.Status != ticket.StatusLost || got.PrizeCents != 0 {
+	if got := repo.updated[1]; got.ID != "lost" || got.Status != ticket.StatusLost || got.PrizeCents != 0 || !slices.Equal(got.Balls, balls) {
 		t.Fatalf("unexpected lost ticket: %+v", got)
 	}
 }

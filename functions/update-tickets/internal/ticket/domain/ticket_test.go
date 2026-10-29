@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 var balls = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 
@@ -46,5 +49,18 @@ func TestSettleLost(t *testing.T) {
 	ticket.Settle(balls)
 	if ticket.Status != StatusLost || ticket.PrizeCents != 0 {
 		t.Fatalf("got status %s prize %d", ticket.Status, ticket.PrizeCents)
+	}
+}
+
+func TestSettleKeepsACopyOfTheBalls(t *testing.T) {
+	drawn := slices.Clone(balls)
+	ticket := Ticket{Status: StatusPending, Bets: []Bet{{Nums: []int{80}, ValueCents: 1000}}}
+	ticket.Settle(drawn)
+	if !slices.Equal(ticket.Balls, balls) {
+		t.Fatalf("got balls %v", ticket.Balls)
+	}
+	drawn[0] = 99
+	if ticket.Balls[0] != 1 {
+		t.Fatal("ticket balls alias the draw balls")
 	}
 }

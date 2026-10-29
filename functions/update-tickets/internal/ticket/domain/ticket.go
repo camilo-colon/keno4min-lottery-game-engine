@@ -22,6 +22,7 @@ type Ticket struct {
 	Bets       []Bet
 	Status     Status
 	PrizeCents int64
+	Balls      []int
 }
 
 // Prize devuelve el pago de la apuesta en centavos según las balotas del sorteo.
@@ -39,8 +40,10 @@ func (b Bet) Prize(balls []int) int64 {
 	return b.ValueCents * factors[hits] / 100
 }
 
-// Settle suma el premio de todas las apuestas y marca el ticket como ganador o perdedor.
+// Settle suma el premio de todas las apuestas, marca el ticket como ganador o perdedor
+// y conserva las balotas con las que se liquidó.
 func (t *Ticket) Settle(balls []int) {
+	t.Balls = slices.Clone(balls)
 	t.PrizeCents = 0
 	for _, bet := range t.Bets {
 		t.PrizeCents += bet.Prize(balls)

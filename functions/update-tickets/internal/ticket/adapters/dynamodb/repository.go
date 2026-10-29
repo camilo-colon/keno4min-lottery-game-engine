@@ -54,20 +54,25 @@ func (r *Repository) ListByTIR(ctx context.Context, tir uint64) ([]ticket.Ticket
 	}
 }
 
-// Update guarda el resultado solo si el ticket sigue pendiente, para no pisar
-// un ticket cancelado o ya liquidado.
+// Update guarda el resultado y las balotas solo si el ticket sigue pendiente,
+// para no pisar un ticket cancelado o ya liquidado.
 func (r *Repository) Update(ctx context.Context, t *ticket.Ticket) error {
-	_, err := r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+	balls, err := attributevalue.Marshal(t.Balls)
+	if err != nil {
+		return fmt.Errorf("marshal ticket balls: %w", err)
+	}
+	_, err = r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:           aws.String(r.tableName),
 		Key:                 key(t.ID),
-		UpdateExpression:    aws.String("SET #status = :status, #prizeCents = :prizeCents"),
+		UpdateExpression:    aws.String("SET #status = :status, #prizeCents = :prizeCents, #balls = :balls"),
 		ConditionExpression: aws.String("#status = :pending"),
 		ExpressionAttributeNames: map[string]string{
-			"#status": "status", "#prizeCents": "prizeCents",
+			"#status": "status", "#prizeCents": "prizeCents", "#balls": "balls",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":status":     &types.AttributeValueMemberS{Value: string(t.Status)},
 			":prizeCents": &types.AttributeValueMemberN{Value: strconv.FormatInt(t.PrizeCents, 10)},
+			":balls":      balls,
 			":pending":    &types.AttributeValueMemberS{Value: string(ticket.StatusPending)},
 		},
 	})
