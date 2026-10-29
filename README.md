@@ -85,19 +85,20 @@ El adaptador recibe el cliente DynamoDB y el nombre de la tabla por constructor.
 
 El dominio del módulo draw contiene la misma entidad `Draw` y el
 constructor de create-draw, con fechas UTC y una ventana de 157 segundos.
-`Draw.AssignVideo(videoID, balls)` asigna el video y copia las bolas para evitar
-compartir su slice con el catálogo. El caso de uso aplica este método a una copia
+`Draw.AssignVideo(videoID, balls)` asigna el video, copia las bolas para evitar
+compartir su slice con el catálogo y cambia `status` de `open` a `drawn`. El caso
+de uso aplica este método a una copia
 del draw antes de persistirla, conservando la entrada si falla el guardado.
 Su puerto `Repository.Update(ctx, *Draw)` se implementa en
 el adaptador DynamoDB del módulo draw.
 `item.go` define el formato de `latestResult` y su conversión desde el dominio.
 `Update` serializa ese formato y ejecuta la transacción; los métodos privados
 `updateDraw` y `updateRuntime` construyen sus dos operaciones.
-Una transacción actualiza `balls` y `videoId` en `DRAW#<id> / META` y publica
+Una transacción actualiza `balls`, `videoId` y `status` en `DRAW#<id> / META` y publica
 `latestResult` en `DRAW_RUNTIME / META`, conservando `current` y los demás
 atributos. Ambas actualizaciones se realizan sin condiciones de existencia o
-comparación de TIR. Si el sorteo no existe, se crea con sus claves, `balls` y
-`videoId`; si existe, sus demás atributos se conservan.
+comparación de TIR. Si el sorteo no existe, se crea con sus claves, `balls`,
+`videoId` y `status`; si existe, sus demás atributos se conservan.
 `latestResult` contiene `drawId`, `tir`, `balls` y `videoId` y se reemplaza sin
 comparar el TIR publicado, incluso si el recibido es anterior. Si el registro de
 runtime no existe, se crea con `latestResult`. Los errores cancelan la
@@ -281,7 +282,8 @@ sam local invoke DrawVideoFunction --event events/draw-video.json
 Esta invocación consulta los videos y **actualiza el sorteo en la tabla
 configurada**. El draw del evento debe existir en `DRAW#<id> / META` y el catálogo
 debe contener al menos un registro con `PK = VIDEO`. La salida conserva los
-campos del draw y añade las `balls` y el `videoId` seleccionados.
+campos del draw, añade las `balls` y el `videoId` seleccionados y devuelve
+`status` como `drawn`.
 
 `samconfig.toml` define dos stacks independientes:
 

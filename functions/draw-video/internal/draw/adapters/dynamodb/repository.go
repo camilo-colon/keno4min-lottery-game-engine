@@ -30,7 +30,7 @@ func (r *Repository) Update(ctx context.Context, d *draw.Draw) error {
 	}
 	_, err = r.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
-			r.updateDraw(d.ID, record),
+			r.updateDraw(d, record),
 			r.updateRuntime(record),
 		},
 	})
@@ -40,20 +40,21 @@ func (r *Repository) Update(ctx context.Context, d *draw.Draw) error {
 	return nil
 }
 
-func (r *Repository) updateDraw(drawID string, record map[string]types.AttributeValue) types.TransactWriteItem {
+func (r *Repository) updateDraw(d *draw.Draw, record map[string]types.AttributeValue) types.TransactWriteItem {
 	return types.TransactWriteItem{Update: &types.Update{
 		TableName:        aws.String(r.tableName),
-		Key:              key("DRAW#" + drawID),
-		UpdateExpression: aws.String("SET #balls = :balls, #videoId = :videoId, #gsi1pk = :gsi1pk, #gsi1sk = :gsi1sk"),
+		Key:              key("DRAW#" + d.ID),
+		UpdateExpression: aws.String("SET #balls = :balls, #videoId = :videoId, #status = :status, #gsi1pk = :gsi1pk, #gsi1sk = :gsi1sk"),
 		ExpressionAttributeNames: map[string]string{
-			"#balls": "balls", "#videoId": "videoId",
+			"#balls": "balls", "#videoId": "videoId", "#status": "status",
 			"#gsi1pk": "GSI1PK",
 			"#gsi1sk": "GSI1SK",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":balls": record["balls"], ":videoId": record["videoId"],
+			":status": &types.AttributeValueMemberS{Value: d.Status},
 			":gsi1pk": &types.AttributeValueMemberS{Value: "DRAW#DRAWN"},
-			":gsi1sk": &types.AttributeValueMemberS{Value: fmt.Sprintf("DRAW#%s", drawID)},
+			":gsi1sk": &types.AttributeValueMemberS{Value: fmt.Sprintf("DRAW#%s", d.ID)},
 		},
 	}}
 }

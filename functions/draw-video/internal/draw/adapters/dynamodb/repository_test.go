@@ -46,13 +46,16 @@ func TestUpdateWritesDrawAndRuntimeTogether(t *testing.T) {
 			!reflect.DeepEqual(drawUpdate.Key, drawKey("DRAW#draw-1")) || !reflect.DeepEqual(runtimeUpdate.Key, drawKey("DRAW_RUNTIME")) {
 			t.Fatalf("unexpected transaction targets: %+v", transaction)
 		}
-		if aws.ToString(drawUpdate.UpdateExpression) != "SET #balls = :balls, #videoId = :videoId, #gsi1pk = :gsi1pk, #gsi1sk = :gsi1sk" ||
+		if aws.ToString(drawUpdate.UpdateExpression) != "SET #balls = :balls, #videoId = :videoId, #status = :status, #gsi1pk = :gsi1pk, #gsi1sk = :gsi1sk" ||
 			drawUpdate.ConditionExpression != nil ||
 			!reflect.DeepEqual(drawUpdate.ExpressionAttributeNames, map[string]string{
-				"#balls": "balls", "#videoId": "videoId", "#gsi1pk": "GSI1PK", "#gsi1sk": "GSI1SK",
+				"#balls": "balls", "#videoId": "videoId", "#status": "status", "#gsi1pk": "GSI1PK", "#gsi1sk": "GSI1SK",
 			}) ||
-			len(drawUpdate.ExpressionAttributeValues) != 4 {
+			len(drawUpdate.ExpressionAttributeValues) != 5 {
 			t.Fatalf("unsafe draw update: %+v", drawUpdate)
+		}
+		if !reflect.DeepEqual(drawUpdate.ExpressionAttributeValues[":status"], &types.AttributeValueMemberS{Value: draw.StatusDrawn}) {
+			t.Fatalf("unexpected draw status: %+v", drawUpdate.ExpressionAttributeValues)
 		}
 		if !reflect.DeepEqual(drawUpdate.ExpressionAttributeValues[":gsi1pk"], &types.AttributeValueMemberS{Value: "DRAW#DRAWN"}) ||
 			!reflect.DeepEqual(drawUpdate.ExpressionAttributeValues[":gsi1sk"], &types.AttributeValueMemberS{Value: "DRAW#draw-1"}) {
@@ -84,7 +87,7 @@ func TestUpdateWritesDrawAndRuntimeTogether(t *testing.T) {
 		}
 		return &dynamodb.TransactWriteItemsOutput{}, nil
 	})
-	if err := NewRepository(client, "table").Update(ctx, &draw.Draw{ID: "draw-1", TIR: math.MaxUint64, Balls: balls, VideoID: "0007"}); err != nil {
+	if err := NewRepository(client, "table").Update(ctx, &draw.Draw{ID: "draw-1", TIR: math.MaxUint64, Status: draw.StatusDrawn, Balls: balls, VideoID: "0007"}); err != nil {
 		t.Fatal(err)
 	}
 	if calls != 1 {

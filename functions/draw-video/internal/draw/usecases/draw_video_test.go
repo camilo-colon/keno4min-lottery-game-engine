@@ -42,7 +42,7 @@ func TestDrawVideoSelectsAndPersistsMatchingVideo(t *testing.T) {
 			drawRepository{update: func(gotCtx context.Context, d *draw.Draw) error {
 				writes++
 				if gotCtx != ctx || d == input || d.ID != input.ID || d.TIR != input.TIR ||
-					d.Status != input.Status || d.StartsAt != input.StartsAt || d.ClosesAt != input.ClosesAt || reads != 1 {
+					d.Status != draw.StatusDrawn || d.StartsAt != input.StartsAt || d.ClosesAt != input.ClosesAt || reads != 1 {
 					t.Fatalf("unexpected update: id=%s, reads=%d", d.ID, reads)
 				}
 				selected = video.Video{ID: d.VideoID, Balls: d.Balls}
@@ -71,7 +71,7 @@ func TestDrawVideoSelectsAndPersistsMatchingVideo(t *testing.T) {
 			t.Fatalf("selected=%+v, reads=%d, writes=%d", selected, reads, writes)
 		}
 		want := original
-		want.VideoID, want.Balls = selected.ID, selected.Balls
+		want.VideoID, want.Balls, want.Status = selected.ID, selected.Balls, draw.StatusDrawn
 		if result != persisted || !reflect.DeepEqual(result, &want) || !reflect.DeepEqual(input, &original) {
 			t.Fatalf("result=%+v, input=%+v", result, input)
 		}

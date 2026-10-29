@@ -109,33 +109,33 @@ func TestDynamoDBIntegration(t *testing.T) {
 				t.Fatalf("draw and runtime disagree on %s", field)
 			}
 		}
-		if !reflect.DeepEqual(canonical["status"], &types.AttributeValueMemberS{Value: "open"}) {
-			t.Fatal("draw status changed")
+		if !reflect.DeepEqual(canonical["status"], &types.AttributeValueMemberS{Value: draw.StatusDrawn}) {
+			t.Fatal("draw status was not marked as drawn")
 		}
 	}
-	if err := repository.Update(ctx, &draw.Draw{ID: "draw-2", TIR: 2, Balls: []int{63, 80}, VideoID: "0007"}); err != nil {
+	if err := repository.Update(ctx, &draw.Draw{ID: "draw-2", TIR: 2, Status: draw.StatusDrawn, Balls: []int{63, 80}, VideoID: "0007"}); err != nil {
 		t.Fatal(err)
 	}
 	checkResult("draw-2", 2, []int{63, 80}, "0007")
-	if err := repository.Update(ctx, &draw.Draw{ID: "draw-3", TIR: 3, Balls: []int{37, 31}, VideoID: "3573"}); err != nil {
+	if err := repository.Update(ctx, &draw.Draw{ID: "draw-3", TIR: 3, Status: draw.StatusDrawn, Balls: []int{37, 31}, VideoID: "3573"}); err != nil {
 		t.Fatal(err)
 	}
 	checkResult("draw-3", 3, []int{37, 31}, "3573")
 	// Runtime publication is unconditional, including when the TIR is older.
-	if err := repository.Update(ctx, &draw.Draw{ID: "draw-1", TIR: 1, Balls: []int{68, 57}, VideoID: "0001"}); err != nil {
+	if err := repository.Update(ctx, &draw.Draw{ID: "draw-1", TIR: 1, Status: draw.StatusDrawn, Balls: []int{68, 57}, VideoID: "0001"}); err != nil {
 		t.Fatal(err)
 	}
 	checkResult("draw-1", 1, []int{68, 57}, "0001")
 	// Replaying the current TIR keeps both records consistent.
-	if err := repository.Update(ctx, &draw.Draw{ID: "draw-3", TIR: 3, Balls: []int{70, 79}, VideoID: "0008"}); err != nil {
+	if err := repository.Update(ctx, &draw.Draw{ID: "draw-3", TIR: 3, Status: draw.StatusDrawn, Balls: []int{70, 79}, VideoID: "0008"}); err != nil {
 		t.Fatal(err)
 	}
 	checkResult("draw-3", 3, []int{70, 79}, "0008")
-	if err := repository.Update(ctx, &draw.Draw{ID: "missing", TIR: 4, Balls: []int{1, 2}, VideoID: "0009"}); err != nil {
+	if err := repository.Update(ctx, &draw.Draw{ID: "missing", TIR: 4, Status: draw.StatusDrawn, Balls: []int{1, 2}, VideoID: "0009"}); err != nil {
 		t.Fatal(err)
 	}
 	wantCreated, err := attributevalue.MarshalMap(map[string]any{
-		"PK": "DRAW#missing", "SK": "META", "balls": []int{1, 2}, "videoId": "0009",
+		"PK": "DRAW#missing", "SK": "META", "balls": []int{1, 2}, "videoId": "0009", "status": draw.StatusDrawn,
 		"GSI1PK": "DRAW#DRAWN", "GSI1SK": "DRAW#missing",
 	})
 	if err != nil {
@@ -145,7 +145,7 @@ func TestDynamoDBIntegration(t *testing.T) {
 		t.Fatal("missing draw was not created with balls, videoId and drawn index keys")
 	}
 	beforeDraw := get("DRAW#draw-2")
-	if err := repository.Update(ctx, &draw.Draw{ID: "draw-2", TIR: 4, Balls: []int{1, 2}, VideoID: "0009"}); err != nil {
+	if err := repository.Update(ctx, &draw.Draw{ID: "draw-2", TIR: 4, Status: draw.StatusDrawn, Balls: []int{1, 2}, VideoID: "0009"}); err != nil {
 		t.Fatal(err)
 	}
 	afterDraw := get("DRAW#draw-2")
@@ -164,7 +164,7 @@ func TestDynamoDBIntegration(t *testing.T) {
 	if _, err := client.DeleteItem(ctx, &dynamodb.DeleteItemInput{TableName: aws.String(tableName), Key: drawKey("DRAW_RUNTIME")}); err != nil {
 		t.Fatal(err)
 	}
-	if err := repository.Update(ctx, &draw.Draw{ID: "draw-2", TIR: 2, Balls: []int{1, 2}, VideoID: "0009"}); err != nil {
+	if err := repository.Update(ctx, &draw.Draw{ID: "draw-2", TIR: 2, Status: draw.StatusDrawn, Balls: []int{1, 2}, VideoID: "0009"}); err != nil {
 		t.Fatal(err)
 	}
 	recreated := get("DRAW_RUNTIME")
