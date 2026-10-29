@@ -1,5 +1,5 @@
 {
-  "Comment": "Crea un draw de forma idempotente, espera hasta closesAt y asigna las balls y el videoId de un video elegido al azar.",
+  "Comment": "Crea un draw de forma idempotente, espera hasta closesAt y asigna las balls y el videoId de un video elegido al azar y liquida los tickets del sorteo.",
   "StartAt": "CreateDraw",
   "States": {
     "CreateDraw": {
@@ -36,6 +36,24 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "FunctionName": "${DrawVideoFunctionArn}",
+        "Payload.$": "$"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "BackoffRate": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "OutputPath": "$.Payload",
+      "Next": "UpdateTickets"
+    },
+    "UpdateTickets": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${UpdateTicketsFunctionArn}",
         "Payload.$": "$"
       },
       "Retry": [
