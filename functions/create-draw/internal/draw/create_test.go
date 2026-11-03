@@ -51,8 +51,12 @@ func TestCreateAndRepeatRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := uuid.Parse(result.ID); err != nil {
+	id, err := uuid.Parse(result.ID)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if id[6]>>4 != 7 {
+		t.Fatalf("expected UUID v7, got %s", result.ID)
 	}
 	if result.TIR != 11 || result.Status != "open" || result.ClosesAt.Sub(result.StartsAt) != Duration {
 		t.Fatalf("unexpected draw: %+v", result)
@@ -66,12 +70,20 @@ func TestCreateAndRepeatRequest(t *testing.T) {
 	}
 }
 
-func TestCreateRejectsBlankRequestBeforeAllocating(t *testing.T) {
+func TestCreateAcceptsBlankRequestAndPreservesIdempotency(t *testing.T) {
 	for _, id := range []string{"", " \t\n"} {
 		r := &memoryRepository{}
-		_, err := NewCreate(r).Execute(context.Background(), id)
-		if err == nil || r.counter != 0 || r.saves != 0 {
+		create := NewCreate(r)
+		result, err := create.Execute(context.Background(), id)
+		if err != nil || result == nil {
 			t.Fatalf("unexpected result for %q: %+v, %v", id, r, err)
+		}
+		if result.TIR != 1 || r.counter != 1 || r.saves != 1 || r.requestID != id || r.existing != result {
+			t.Fatalf("blank request %q was not saved unchanged: %+v", id, r)
+		}
+		again, err := create.Execute(context.Background(), id)
+		if err != nil || again != result || r.counter != 1 || r.saves != 1 || r.requestID != id {
+			t.Fatalf("duplicate blank request %q consumed a TIR or changed the draw: %+v, %v", id, r, err)
 		}
 	}
 }

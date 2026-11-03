@@ -41,6 +41,56 @@ Resources:
                 - dynamodb:UpdateItem
               Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
 
+  DrawVideoFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: functions/draw-video/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 15
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref DynamoDBTableName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+              Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
+
+  UpdateTicketsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: functions/update-tickets/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 60
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref DynamoDBTableName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}/index/GSI1
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
+
   GameWorkflow:
     Type: AWS::Serverless::StateMachine
     Properties:
@@ -48,9 +98,15 @@ Resources:
       DefinitionUri: statemachine/game-workflow.asl.json
       DefinitionSubstitutions:
         CreateDrawFunctionArn: !GetAtt CreateDrawFunction.Arn
+        DrawVideoFunctionArn: !GetAtt DrawVideoFunction.Arn
+        UpdateTicketsFunctionArn: !GetAtt UpdateTicketsFunction.Arn
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref CreateDrawFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DrawVideoFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateTicketsFunction
       Events:
         EveryThreeMinutes:
           Type: ScheduleV2
@@ -70,3 +126,9 @@ Outputs:
   CreateDrawFunctionArn:
     Description: ARN de la Lambda create-draw
     Value: !GetAtt CreateDrawFunction.Arn
+  DrawVideoFunctionArn:
+    Description: ARN de la Lambda draw-video
+    Value: !GetAtt DrawVideoFunction.Arn
+  UpdateTicketsFunctionArn:
+    Description: ARN de la Lambda update-tickets
+    Value: !GetAtt UpdateTicketsFunction.Arn

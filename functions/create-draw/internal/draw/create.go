@@ -2,8 +2,6 @@ package draw
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"time"
 	"uuid"
 )
@@ -23,10 +21,6 @@ func NewCreate(repository Repository) *Create {
 }
 
 func (c *Create) Execute(ctx context.Context, requestID string) (*Draw, error) {
-	if strings.TrimSpace(requestID) == "" {
-		return nil, errors.New("requestId is required")
-	}
-
 	existing, err := c.repository.FindByRequestID(ctx, requestID)
 	if err != nil || existing != nil {
 		return existing, err
@@ -37,7 +31,7 @@ func (c *Create) Execute(ctx context.Context, requestID string) (*Draw, error) {
 		return nil, err
 	}
 
-	draw := New(uuid.NewV4().String(), tir, time.Now())
+	draw := New(uuid.NewV7().String(), tir, time.Now())
 	if err := c.repository.Save(ctx, requestID, draw); err != nil {
 		return nil, err
 	}
