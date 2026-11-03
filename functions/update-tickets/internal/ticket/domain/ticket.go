@@ -1,6 +1,15 @@
 package domain
 
-import "slices"
+import (
+	"slices"
+	"time"
+
+	"github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/common"
+	"github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/events"
+)
+
+// Game identifies this product in the events consumed by other systems.
+const Game = "keno4min"
 
 type Status string
 
@@ -17,6 +26,8 @@ type Bet struct {
 }
 
 type Ticket struct {
+	common.AggregateRoot
+
 	ID         string
 	TIR        uint64
 	Bets       []Bet
@@ -40,9 +51,9 @@ func (b Bet) Prize(balls []int) int64 {
 	return b.ValueCents * factors[hits] / 100
 }
 
-// Settle suma el premio de todas las apuestas, marca el ticket como ganador o perdedor
-// y conserva las balotas con las que se liquidó.
-func (t *Ticket) Settle(balls []int) {
+// Settle suma el premio de todas las apuestas, marca el ticket como ganador o perdedor,
+// conserva las balotas con las que se liquidó y registra el evento TicketSettled.
+func (t *Ticket) Settle(balls []int, settledAt time.Time) {
 	t.Balls = slices.Clone(balls)
 	t.PrizeCents = 0
 	for _, bet := range t.Bets {
@@ -52,4 +63,11 @@ func (t *Ticket) Settle(balls []int) {
 	if t.PrizeCents > 0 {
 		t.Status = StatusWinning
 	}
+	t.Record(events.TicketSettled{
+		BaseEvent:  common.NewBaseEvent(settledAt),
+		TicketID:   t.ID,
+		Game:       Game,
+		Status:     string(t.Status),
+		PrizeCents: t.PrizeCents,
+	})
 }

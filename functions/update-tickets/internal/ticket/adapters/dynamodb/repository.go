@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/platform/outbox"
 	ticket "github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/domain"
 	"github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/ports"
 )
@@ -55,13 +56,14 @@ func (r *Repository) ListByTIR(ctx context.Context, tir uint64) ([]ticket.Ticket
 }
 
 // Update guarda el resultado y las balotas solo si el ticket sigue pendiente,
-// para no pisar un ticket cancelado o ya liquidado.
+// para no pisar un ticket cancelado o ya liquidado. Los eventos pendientes se escriben
+// como registros OUTBOX# en la misma transacción, así solo se publican si el ticket cambió.
 func (r *Repository) Update(ctx context.Context, t *ticket.Ticket) error {
 	balls, err := attributevalue.Marshal(t.Balls)
 	if err != nil {
 		return fmt.Errorf("marshal ticket balls: %w", err)
 	}
-	_, err = r.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+	transactItems := []types.TransactWriteItem{{Update: &types.Update{
 		TableName:           aws.String(r.tableName),
 		Key:                 key(t.ID),
 		UpdateExpression:    aws.String("SET #status = :status, #prizeCents = :prizeCents, #balls = :balls"),
@@ -75,6 +77,13 @@ func (r *Repository) Update(ctx context.Context, t *ticket.Ticket) error {
 			":balls":      balls,
 			":pending":    &types.AttributeValueMemberS{Value: string(ticket.StatusPending)},
 		},
+	}}}
+	outboxItems, err := outbox.TransactItems(r.tableName, t)
+	if err != nil {
+		return fmt.Errorf("outbox for ticket %s: %w", t.ID, err)
+	}
+	_, err = r.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: append(transactItems, outboxItems...),
 	})
 	if err != nil {
 		return fmt.Errorf("update ticket: %w", err)

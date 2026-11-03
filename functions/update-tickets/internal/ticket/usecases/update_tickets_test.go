@@ -6,7 +6,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/common"
 	ticket "github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/domain"
+	"github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/events"
 )
 
 type fakeRepository struct {
@@ -14,6 +16,7 @@ type fakeRepository struct {
 	listErr   error
 	updateErr error
 	updated   []ticket.Ticket
+	events    []common.DomainEvent
 }
 
 func (f *fakeRepository) ListByTIR(_ context.Context, _ uint64) ([]ticket.Ticket, error) {
@@ -24,6 +27,7 @@ func (f *fakeRepository) Update(_ context.Context, t *ticket.Ticket) error {
 	if f.updateErr != nil {
 		return f.updateErr
 	}
+	f.events = append(f.events, t.PullDomainEvents()...)
 	f.updated = append(f.updated, *t)
 	return nil
 }
@@ -48,6 +52,14 @@ func TestExecuteSettlesOnlyPendingTickets(t *testing.T) {
 	}
 	if got := repo.updated[1]; got.ID != "lost" || got.Status != ticket.StatusLost || got.PrizeCents != 0 || !slices.Equal(got.Balls, balls) {
 		t.Fatalf("unexpected lost ticket: %+v", got)
+	}
+	if len(repo.events) != 2 {
+		t.Fatalf("saved %d events, want one per settled ticket", len(repo.events))
+	}
+	for i, want := range []string{"win", "lost"} {
+		if got, ok := repo.events[i].(events.TicketSettled); !ok || got.TicketID != want {
+			t.Fatalf("event %d = %+v, want TicketSettled for %s", i, repo.events[i], want)
+		}
 	}
 }
 

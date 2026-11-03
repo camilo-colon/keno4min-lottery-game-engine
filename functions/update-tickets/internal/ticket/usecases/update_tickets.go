@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	ticket "github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/domain"
 	"github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/ports"
@@ -28,13 +29,14 @@ func (u *UpdateTickets) Execute(ctx context.Context, tir uint64, balls []int) (i
 	if err != nil {
 		return 0, fmt.Errorf("list tickets: %w", err)
 	}
+	settledAt := time.Now()
 	updated := 0
 	for i := range tickets {
 		t := &tickets[i]
 		if t.Status != ticket.StatusPending {
 			continue
 		}
-		t.Settle(balls)
+		t.Settle(balls, settledAt)
 		if err := u.tickets.Update(ctx, t); err != nil {
 			return updated, fmt.Errorf("update ticket %s: %w", t.ID, err)
 		}

@@ -88,6 +88,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:UpdateItem
+                - dynamodb:PutItem
               Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
 
   GameWorkflow:

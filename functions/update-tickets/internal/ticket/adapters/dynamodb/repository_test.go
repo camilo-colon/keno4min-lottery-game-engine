@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -12,7 +13,7 @@ import (
 	ticket "github.com/cronos/keno4min-draw-engine/functions/update-tickets/internal/ticket/domain"
 )
 
-func TestUpdateStoresResultAndBallsWhilePending(t *testing.T) {
+func TestUpdateStoresResultAndOutboxInOneTransaction(t *testing.T) {
 	calls := 0
 	client := dynamodb.New(dynamodb.Options{
 		Region: "us-east-1",
@@ -20,11 +21,18 @@ func TestUpdateStoresResultAndBallsWhilePending(t *testing.T) {
 			func(stack *middleware.Stack) error {
 				return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("testTicketWrite", func(_ context.Context, input middleware.InitializeInput, _ middleware.InitializeHandler) (middleware.InitializeOutput, middleware.Metadata, error) {
 					calls++
-					update, ok := input.Parameters.(*dynamodb.UpdateItemInput)
+					transaction, ok := input.Parameters.(*dynamodb.TransactWriteItemsInput)
 					if !ok {
 						t.Fatalf("unexpected request: %+v", input.Parameters)
 					}
-					if aws.ToString(update.UpdateExpression) != "SET #status = :status, #prizeCents = :prizeCents, #balls = :balls" ||
+					if len(transaction.TransactItems) != 2 {
+						t.Fatalf("got %d transact items, want ticket update and outbox put", len(transaction.TransactItems))
+					}
+
+					update := transaction.TransactItems[0].Update
+					if update == nil ||
+						aws.ToString(update.TableName) != "table" ||
+						aws.ToString(update.UpdateExpression) != "SET #status = :status, #prizeCents = :prizeCents, #balls = :balls" ||
 						aws.ToString(update.ConditionExpression) != "#status = :pending" ||
 						!reflect.DeepEqual(update.Key, key("ticket-1")) {
 						t.Fatalf("unexpected update: %+v", update)
@@ -38,14 +46,22 @@ func TestUpdateStoresResultAndBallsWhilePending(t *testing.T) {
 						!reflect.DeepEqual(update.ExpressionAttributeValues[":prizeCents"], &types.AttributeValueMemberN{Value: "0"}) {
 						t.Fatalf("unexpected values: %+v", update.ExpressionAttributeValues)
 					}
-					return middleware.InitializeOutput{Result: &dynamodb.UpdateItemOutput{}}, middleware.Metadata{}, nil
+
+					put := transaction.TransactItems[1].Put
+					if put == nil || aws.ToString(put.TableName) != "table" ||
+						aws.ToString(put.ConditionExpression) != "attribute_not_exists(PK)" ||
+						!reflect.DeepEqual(put.Item["eventType"], &types.AttributeValueMemberS{Value: "cronos.keno4min.ticket.settled"}) {
+						t.Fatalf("unexpected outbox put: %+v", put)
+					}
+					return middleware.InitializeOutput{Result: &dynamodb.TransactWriteItemsOutput{}}, middleware.Metadata{}, nil
 				}), middleware.Before)
 			},
 		},
 	})
-	err := NewRepository(client, "table").Update(t.Context(), &ticket.Ticket{
-		ID: "ticket-1", Status: ticket.StatusLost, Balls: []int{61, 8},
-	})
+	settled := &ticket.Ticket{ID: "ticket-1", Status: ticket.StatusPending, Bets: []ticket.Bet{{Nums: []int{80}, ValueCents: 1000}}}
+	settled.Settle([]int{61, 8}, time.Date(2026, 11, 2, 21, 30, 0, 0, time.UTC))
+
+	err := NewRepository(client, "table").Update(t.Context(), settled)
 	if err != nil || calls != 1 {
 		t.Fatalf("Update() = %v; calls=%d", err, calls)
 	}
