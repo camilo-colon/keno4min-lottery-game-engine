@@ -43,9 +43,11 @@ AWS una vez y adapta la entrada de Lambda. No se necesita un contenedor de inyec
 `cmd/lambda/main.go` y un Makefile que construye `bootstrap` para Linux ARM64.
 El handler recibe el draw creado por create-draw, ejecuta el caso de uso
 `DrawVideo` y devuelve el draw actualizado. Configura un único cliente DynamoDB
-durante la inicialización y lo comparte entre los adaptadores de draw y video.
+durante la inicialización y lo usa solo para el adaptador de draw; los videos
+vienen del catálogo incrustado en el binario, que se interpreta una vez al iniciar
+(si está roto, la Lambda falla en la inicialización). DrawVideo se ejecuta con 1024 MB.
 Requiere `DYNAMODB_TABLE`, configurada por el parámetro SAM `DynamoDBTableName`.
-Su rol permite únicamente Query y UpdateItem sobre esa tabla. Los errores se
+Su rol permite únicamente UpdateItem sobre esa tabla. Los errores se
 registran y se propagan a Step Functions. Step Functions tiene permiso de
 invocar ambas Lambdas y reintenta los errores transitorios del servicio Lambda.
 
@@ -64,24 +66,26 @@ functions/draw-video/internal/
 └── video/
     ├── domain/video.go
     ├── ports/repository.go
-    └── adapters/dynamodb/
-        ├── item.go
+    └── adapters/embedded/     # catálogo incrustado, usado por la Lambda
+        ├── catalog.txt
         ├── repository.go
         └── repository_test.go
+
+functions/draw-video/cmd/lambda/main.go   # handler
 ```
 
 Cada módulo contiene su dominio, sus puertos y sus adaptadores. Los puertos
-dependen del dominio y los adaptadores implementan `ports.Repository`. Ambos
-adaptadores exponen `Repository` y `NewRepository(client, tableName)` y reciben
-directamente `*dynamodb.Client`.
+dependen del dominio y los adaptadores implementan `ports.Repository`. El
+adaptador DynamoDB de draw expone `Repository` y `NewRepository(client, tableName)` y
+recibe directamente `*dynamodb.Client`. En cambio, `embedded.NewRepository()` no
+recibe argumentos y devuelve un error si el catálogo es inválido.
 
 El dominio de video define `Video` (`id` y `balls`) y el constructor
-`New(id, balls)`. Su puerto `Repository.GetAll(ctx) ([]Video, error)` se
-implementa mediante una Query por `PK = VIDEO`, con `SK` e `id` de tipo
-String y `balls` como lista de números. Recorre todas las páginas, conserva el
-orden de las bolas y devuelve una lista vacía si no hay videos. Los errores de
-consulta o decodificación se propagan sin devolver resultados parciales.
-El adaptador recibe el cliente DynamoDB y el nombre de la tabla por constructor.
+`New(id, balls)`. Su puerto `Repository.GetAll(ctx) ([]Video, error)` lo
+implementa el adaptador `embedded`, que devuelve el catálogo ya
+interpretado, sin I/O (ver "Catálogo de videos incrustado"). Este módulo no lee
+videos de DynamoDB. Las bolas del sorteo y de `latestResult` se guardan como
+listas de números.
 
 El dominio del módulo draw contiene la misma entidad `Draw` y el
 constructor de create-draw, con fechas UTC y una ventana de 157 segundos.
@@ -103,11 +107,11 @@ comparación de TIR. Si el sorteo no existe, se crea con sus claves, `balls`,
 comparar el TIR publicado, incluso si el recibido es anterior. Si el registro de
 runtime no existe, se crea con `latestResult`. Los errores cancelan la
 transacción y se propagan sin realizar una escritura alternativa.
-Los permisos Query y UpdateItem de la Lambda cubren estas operaciones.
+El permiso UpdateItem de la Lambda cubre estas operaciones.
 
 El caso de uso `draw/usecases.DrawVideo`, construido con
 `NewDrawVideo(drawRepository, videoRepository)`, expone
-`Execute(ctx, *Draw) (*Draw, error)`. Consulta todos los videos, selecciona uno
+`Execute(ctx, *Draw) (*Draw, error)`. Obtiene todos los videos del catálogo incrustado, selecciona uno
 uniformemente con `crypto/rand` y persiste sus `balls` e `id` como `videoId` del
 sorteo. Devuelve una copia del draw actualizado después del guardado, conservando
 los demás campos. Si el catálogo está vacío devuelve `ErrNoVideos`; los errores
@@ -264,6 +268,25 @@ cualquier TIR y creación de registros ausentes. También comprueba que un TIR
 recibido diferente no impide actualizar el sorteo ni modifica su atributo `tir`.
 Sin `DYNAMODB_INTEGRATION=1` se omite.
 
+## Catálogo de videos incrustado
+
+`catalog.txt` es la única fuente del catálogo: un id por línea, incrustado en el
+binario con `go:embed` e interpretado una vez al iniciar. Los registros `VIDEO`
+se eliminaron de DynamoDB el 2026-11-19. Cada id codifica sus 20 bolas, con el
+formato `<consecutivo>_<20 bolas de dos dígitos separadas por comas>`.
+
+Para agregar o quitar videos:
+
+1. Editar `functions/draw-video/internal/video/adapters/embedded/catalog.txt` a mano.
+2. Ejecutar `go test ./...` desde `functions/draw-video/`. Se rechazan líneas mal
+   formadas, ids duplicados y cantidades de bolas incorrectas; si el catálogo está
+   roto, además, la Lambda falla en la inicialización.
+3. Commitear el archivo (sin él el módulo no compila) y volver a desplegar el
+   motor, porque el catálogo vive dentro del binario.
+
+Precaución: todo id del catálogo debe ser un video que las pantallas ya puedan
+descargar; el motor no lo comprueba.
+
 ## Invocación y despliegue
 
 ```sh
@@ -279,9 +302,9 @@ Para invocar draw-video (requiere Docker activo y credenciales AWS):
 sam local invoke DrawVideoFunction --event events/draw-video.json
 ```
 
-Esta invocación consulta los videos y **actualiza el sorteo en la tabla
-configurada**. El draw del evento debe existir en `DRAW#<id> / META` y el catálogo
-debe contener al menos un registro con `PK = VIDEO`. La salida conserva los
+Esta invocación usa el catálogo incrustado en el binario (no lee videos de
+DynamoDB) y **actualiza el sorteo en la tabla
+configurada**. El draw del evento debe existir en `DRAW#<id> / META`. La salida conserva los
 campos del draw, añade las `balls` y el `videoId` seleccionados y devuelve
 `status` como `drawn`.
 

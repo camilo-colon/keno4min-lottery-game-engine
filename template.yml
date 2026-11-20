@@ -51,7 +51,7 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
-      MemorySize: 128
+      MemorySize: 1024
       Timeout: 15
       Environment:
         Variables:
@@ -60,7 +60,6 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
-                - dynamodb:Query
                 - dynamodb:UpdateItem
               Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
 

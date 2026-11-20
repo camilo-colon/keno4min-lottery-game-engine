@@ -15,7 +15,7 @@ import (
 	drawstore "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/draw/adapters/dynamodb"
 	draw "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/draw/domain"
 	"github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/draw/usecases"
-	videostore "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/video/adapters/dynamodb"
+	videostore "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/video/adapters/embedded"
 )
 
 func main() {
@@ -46,8 +46,12 @@ func setup() (*usecases.DrawVideo, error) {
 		return nil, err
 	}
 	client := dynamodb.NewFromConfig(cfg)
+	videos, err := videostore.NewRepository()
+	if err != nil {
+		return nil, err
+	}
 	return usecases.NewDrawVideo(
 		drawstore.NewRepository(client, tableName),
-		videostore.NewRepository(client, tableName),
+		videos,
 	), nil
 }
