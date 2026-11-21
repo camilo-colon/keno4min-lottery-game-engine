@@ -60,6 +60,7 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - dynamodb:Query
                 - dynamodb:UpdateItem
               Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}
 
