@@ -1,12 +1,17 @@
 package usecases
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	bet "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/bet/domain"
+	"github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/bitmask"
 	draw "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/draw/domain"
 	video "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/video/domain"
 )
@@ -27,6 +32,101 @@ func (r videoRepository) GetAll(ctx context.Context) ([]video.Video, error) {
 	return r.getAll(ctx)
 }
 
+type betRepository struct {
+	getByTIR func(context.Context, uint64) ([]bet.AdminBets, error)
+}
+
+func (r betRepository) GetByTIR(ctx context.Context, tir uint64) ([]bet.AdminBets, error) {
+	return r.getByTIR(ctx, tir)
+}
+
+var roundWithoutBets = betRepository{getByTIR: func(context.Context, uint64) ([]bet.AdminBets, error) {
+	return nil, nil
+}}
+
+var fourVideos = []video.Video{
+	{ID: "three-hits", Balls: []int{1, 2, 3}},
+	{ID: "two-hits-a", Balls: []int{1, 2, 60}},
+	{ID: "two-hits-b", Balls: []int{1, 3, 61}},
+	{ID: "two-hits-c", Balls: []int{2, 3, 62}},
+}
+
+var fiveNumbers = bet.Bet{Numbers: bitmask.MaskOf([]int{1, 2, 3, 4, 5}), StakeCents: 100}
+
+func drawVideoWith(bets betRepository) *DrawVideo {
+	return NewDrawVideo(
+		drawRepository{update: func(context.Context, *draw.Draw) error { return nil }},
+		videoRepository{getAll: func(context.Context) ([]video.Video, error) { return fourVideos, nil }},
+		bets,
+	)
+}
+
+func timesEachVideoWasDrawn(t *testing.T, usecase *DrawVideo, rounds int) map[string]int {
+	timesDrawn := make(map[string]int)
+	for range rounds {
+		result, err := usecase.Execute(t.Context(), draw.New("draw-1", 42, time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)))
+		if err != nil {
+			t.Fatalf("Execute returned error: %v", err)
+		}
+		timesDrawn[result.VideoID]++
+	}
+	return timesDrawn
+}
+
+func TestDrawVideoNeverDrawsAVideoThePaysheetLeftWithoutWeight(t *testing.T) {
+	usecase := drawVideoWith(betRepository{getByTIR: func(context.Context, uint64) ([]bet.AdminBets, error) {
+		return []bet.AdminBets{{AdminNodeID: "admin-1", Bets: []bet.Bet{fiveNumbers}}}, nil
+	}})
+	timesDrawn := timesEachVideoWasDrawn(t, usecase, 300)
+	if timesDrawn["three-hits"] != 0 || len(timesDrawn) != 3 {
+		t.Fatalf("times each video was drawn = %v, want three-hits never drawn and the other three drawn", timesDrawn)
+	}
+}
+
+func TestDrawVideoPicksUniformlyWhenThePaysheetFails(t *testing.T) {
+	tests := []struct {
+		name     string
+		getByTIR func(context.Context, uint64) ([]bet.AdminBets, error)
+	}{
+		{name: "bets cannot be read", getByTIR: func(context.Context, uint64) ([]bet.AdminBets, error) {
+			return nil, errors.New("query failed")
+		}},
+		{name: "two admins with the same bets", getByTIR: func(context.Context, uint64) ([]bet.AdminBets, error) {
+			return []bet.AdminBets{
+				{AdminNodeID: "admin-1", Bets: []bet.Bet{fiveNumbers}},
+				{AdminNodeID: "admin-2", Bets: []bet.Bet{fiveNumbers}},
+			}, nil
+		}},
+		{name: "reading bets panics", getByTIR: func(context.Context, uint64) ([]bet.AdminBets, error) {
+			panic("unexpected failure")
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			timesDrawn := timesEachVideoWasDrawn(t, drawVideoWith(betRepository{getByTIR: tt.getByTIR}), 300)
+			if len(timesDrawn) != 4 {
+				t.Fatalf("times each video was drawn = %v, want the four videos drawn", timesDrawn)
+			}
+		})
+	}
+}
+
+func TestDrawVideoLogsReadTimeAndComputeTimeSeparately(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	usecase := drawVideoWith(betRepository{getByTIR: func(context.Context, uint64) ([]bet.AdminBets, error) {
+		return []bet.AdminBets{{AdminNodeID: "admin-1", Bets: []bet.Bet{fiveNumbers}}}, nil
+	}})
+	timesEachVideoWasDrawn(t, usecase, 1)
+	for _, want := range []string{`msg="bets read" tir=42 admins=1 readTime=`, `msg="paysheet computed" tir=42 computeTime=`} {
+		if !strings.Contains(logs.String(), want) {
+			t.Fatalf("logs = %q, want them to contain %q", logs.String(), want)
+		}
+	}
+}
+
 func TestDrawVideoSelectsAndPersistsMatchingVideo(t *testing.T) {
 	for _, videos := range [][]video.Video{
 		{{ID: "0007", Balls: []int{63, 80, 37}}},
@@ -37,7 +137,7 @@ func TestDrawVideoSelectsAndPersistsMatchingVideo(t *testing.T) {
 		original := *input
 		var selected video.Video
 		var persisted *draw.Draw
-		reads, writes := 0, 0
+		reads, writes, betReads := 0, 0, 0
 		usecase := NewDrawVideo(
 			drawRepository{update: func(gotCtx context.Context, d *draw.Draw) error {
 				writes++
@@ -56,10 +156,20 @@ func TestDrawVideoSelectsAndPersistsMatchingVideo(t *testing.T) {
 				}
 				return videos, nil
 			}},
+			betRepository{getByTIR: func(gotCtx context.Context, tir uint64) ([]bet.AdminBets, error) {
+				betReads++
+				if gotCtx != ctx || tir != input.TIR {
+					t.Fatalf("unexpected bets read: tir=%d", tir)
+				}
+				return nil, nil
+			}},
 		)
 		result, err := usecase.Execute(ctx, input)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if betReads != 1 {
+			t.Fatalf("bets were read %d times, want 1", betReads)
 		}
 		found := false
 		for _, v := range videos {
@@ -103,6 +213,7 @@ func TestDrawVideoDoesNotUpdateWhenCatalogFailsOrIsEmpty(t *testing.T) {
 				videoRepository{getAll: func(context.Context) ([]video.Video, error) {
 					return nil, tc.err
 				}},
+				roundWithoutBets,
 			)
 			result, err := usecase.Execute(t.Context(), &draw.Draw{ID: "draw-1"})
 			if result != nil || !errors.Is(err, tc.want) {
@@ -121,6 +232,7 @@ func TestDrawVideoPreservesInputWhenUpdateFails(t *testing.T) {
 		videoRepository{getAll: func(context.Context) ([]video.Video, error) {
 			return []video.Video{{ID: "3573", Balls: []int{63, 80}}}, nil
 		}},
+		roundWithoutBets,
 	)
 	result, err := usecase.Execute(t.Context(), input)
 	if result != nil || !errors.Is(err, failure) || !reflect.DeepEqual(input, want) {
