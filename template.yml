@@ -51,7 +51,7 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
-      MemorySize: 128
+      MemorySize: 1024
       Timeout: 15
       Environment:
         Variables:

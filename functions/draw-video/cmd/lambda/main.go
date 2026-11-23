@@ -12,10 +12,11 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	betstore "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/bet/adapters/dynamodb"
 	drawstore "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/draw/adapters/dynamodb"
 	draw "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/draw/domain"
 	"github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/draw/usecases"
-	videostore "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/video/adapters/dynamodb"
+	videostore "github.com/cronos/keno4min-draw-engine/functions/draw-video/internal/video/adapters/embedded"
 )
 
 func main() {
@@ -46,8 +47,13 @@ func setup() (*usecases.DrawVideo, error) {
 		return nil, err
 	}
 	client := dynamodb.NewFromConfig(cfg)
+	videos, err := videostore.NewRepository()
+	if err != nil {
+		return nil, err
+	}
 	return usecases.NewDrawVideo(
 		drawstore.NewRepository(client, tableName),
-		videostore.NewRepository(client, tableName),
+		videos,
+		betstore.NewRepository(client, tableName),
 	), nil
 }
